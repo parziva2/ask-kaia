@@ -1,9 +1,30 @@
 // Initialize socket connection with the correct server URL
 const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://synthetic-woman.onrender.com', {
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    autoConnect: true,
+    withCredentials: true
+});
+
+// Add connection status handling
+socket.on('connect', () => {
+    console.log('Connected to server successfully');
+});
+
+socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+});
+
+socket.on('disconnect', (reason) => {
+    console.log('Disconnected:', reason);
+    if (reason === 'io server disconnect') {
+        // the disconnection was initiated by the server, you need to reconnect manually
+        socket.connect();
+    }
 });
 
 document.addEventListener('DOMContentLoaded', () => {

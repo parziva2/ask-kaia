@@ -12,9 +12,15 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
-    }
+        origin: ["http://localhost:3000", "https://askkaia.com", "https://www.askkaia.com"],
+        methods: ["GET", "POST"],
+        credentials: true,
+        allowedHeaders: ["Content-Type"]
+    },
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
 // Configure OpenAI with custom settings
@@ -230,121 +236,122 @@ async function processMessageQueue() {
         
         // Generate and broadcast response
         const response = await generateResponse(topMessage.message, topMessage.userName);
-        if (!response) {
-            throw new Error('Failed to generate response');
-        }
-
-        console.log('Generated response:', response);
-        
-        try {
-            const audioUrl = await generateAudio(response, topMessage.userId);
-            console.log('Generated audio URL:', audioUrl);
+        if (response) {
+            console.log('Generated response:', response);
             
-            if (!audioUrl) {
-                throw new Error('Failed to generate audio URL');
-            }
-            
-            // Broadcast the response to all connected clients
-            io.emit('new_response', {
-                type: 'response',
-                text: response,
-                audioUrl: audioUrl,
-                userId: topMessage.userId,
-                userName: topMessage.userName,
-                originalMessage: topMessage.message,
-                timestamp: Date.now()
-            });
-            
-            // Update conversation history
-            state.conversationHistory.push(
-                {
+            try {
+                const audioUrl = await generateAudio(response, topMessage.userId);
+                console.log('Generated audio URL:', audioUrl);
+                
+                if (!audioUrl) {
+                    console.error('Failed to generate audio URL');
+                    state.waitingForAudioComplete = false;
+                    return;
+                }
+                
+                // Update conversation history
+                state.conversationHistory.push({
                     type: 'user',
                     text: topMessage.message,
                     userId: topMessage.userId,
+                    userName: topMessage.userName,
                     timestamp: Date.now()
-                },
-                {
-                    type: 'assistant',
+                });
+                
+                state.conversationHistory.push({
+                    type: 'kaia',
                     text: response,
                     timestamp: Date.now()
+                });
+                
+                // Keep history manageable
+                if (state.conversationHistory.length > 10) {
+                    state.conversationHistory = state.conversationHistory.slice(-10);
                 }
-            );
-
-            // Trim conversation history if too long
-            if (state.conversationHistory.length > 10) {
-                state.conversationHistory = state.conversationHistory.slice(-10);
+                
+                // Broadcast to all clients
+                io.emit('kaia-response', {
+                    text: response,
+                    audioUrl: audioUrl,
+                    originalMessage: topMessage.message,
+                    userName: topMessage.userName
+                });
+                
+                // Wait for client to signal audio completion
+                console.log('Waiting for audio playback to complete...');
+                
+            } catch (error) {
+                console.error('Error during audio generation or playback:', error);
+                state.waitingForAudioComplete = false;
             }
-            
-        } catch (error) {
-            console.error('Error in audio generation:', error);
-            io.emit('error', {
-                status: 'error',
-                message: 'Failed to generate audio response'
-            });
+        } else {
+            console.error('Failed to generate response');
+            state.waitingForAudioComplete = false;
         }
     } catch (error) {
-        console.error('Error in message queue processing:', error);
-        io.emit('error', {
-            status: 'error',
-            message: 'Failed to process message queue'
-        });
+        console.error('Error processing message queue:', error);
+        state.waitingForAudioComplete = false;
     } finally {
         state.isProcessing = false;
-        state.waitingForAudioComplete = false;
-        
-        // Process next message if queue not empty
-        if (state.messageQueue.length > 0) {
-            setTimeout(processMessageQueue, 1000);
-        }
+        state.lastMessageTime = Date.now();
     }
 }
 
 // Socket connection handling
 io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
+    console.log('New client connected');
     state.activeListeners.add(socket.id);
-    io.emit('listener_count', state.activeListeners.size);
+    io.emit('listener-count', state.activeListeners.size);
 
     socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
         state.activeListeners.delete(socket.id);
-        io.emit('listener_count', state.activeListeners.size);
+        io.emit('listener-count', state.activeListeners.size);
     });
 
-    socket.on('chat_message', async (data) => {
-        console.log('Received message:', data);
-        try {
-            const { message, userId, userName } = data;
-            if (!message || !userId || !userName) {
-                console.error('Invalid message data:', data);
-                return;
+    // Handle audio completion signal
+    socket.on('audio-complete', () => {
+        console.log('Received audio completion signal');
+        state.waitingForAudioComplete = false;
+        
+        // Add a delay before processing the next message
+        setTimeout(() => {
+            if (state.messageQueue.length > 0) {
+                console.log('Processing next message in queue');
+                processMessageQueue();
+            } else {
+                console.log('Queue empty, waiting for new messages');
             }
+        }, 2000);
+    });
 
-            const score = scoreMessage(message, userId);
+    // Handle incoming messages
+    socket.on('send-message', async (data) => {
+        try {
+            console.log('Received message:', data.message);
+            
+            // Score and queue the message
+            const score = scoreMessage(data.message, data.userId);
             state.messageQueue.push({
-                message,
-                userId,
-                userName,
-                score,
+                message: data.message,
+                userId: data.userId,
+                userName: data.userName,
+                score: score,
                 timestamp: Date.now()
             });
-
-            // Emit message received confirmation
-            socket.emit('message_received', {
-                status: 'success',
-                message: 'Message added to queue'
+            
+            // Broadcast the user's message to all clients
+            io.emit('new-message', {
+                message: data.message,
+                userId: data.userId,
+                userName: data.userName,
+                score: score
             });
-
-            // Start processing queue if not already processing
-            if (!state.isProcessing && !state.waitingForAudioComplete) {
-                processMessageQueue();
-            }
+            
+            // Trigger message processing
+            processMessageQueue();
+            
         } catch (error) {
-            console.error('Error processing chat message:', error);
-            socket.emit('error', {
-                status: 'error',
-                message: 'Failed to process message'
-            });
+            console.error('Error handling message:', error);
         }
     });
 });
@@ -361,10 +368,7 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Start the server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log('OpenAI API Key:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing');
-    console.log('Google Credentials:', process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'Present' : 'Missing');
+    console.log(`Server running on port ${PORT}`);
 }); 
