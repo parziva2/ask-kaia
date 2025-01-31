@@ -277,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.userId !== userId) {
             console.log('Message is from another user, adding to chat');
             addMessage(data.message, 'user', data.userName || 'Anonymous');
-            // No longer requesting response here - server will broadcast it
         } else {
             console.log('Message is from current user, skipping');
         }
@@ -357,17 +356,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date().toISOString()
             };
             
-            // First broadcast the message
-            console.log('Broadcasting message to all users');
-            socket.emit('send-message', messageData);
-            
             // Add message to local chat
             console.log('Adding message to local chat');
             addMessage(message, 'user', name);
             
-            // Then request Kaia's response
-            console.log('Requesting Kaia response');
-            socket.emit('get-response', messageData);
+            // Send message and get response in one event
+            console.log('Sending message and requesting response');
+            socket.emit('chat-message', messageData);
             
             messageInput.value = '';
         }
