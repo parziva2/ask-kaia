@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 audio.addEventListener('loadeddata', () => {
                     console.log('Audio data loaded');
-                    if (hasUserInteractedWithAudio) {
+                    if (!isIOS || hasUserInteractedWithAudio) {
                         startPlayback();
                     }
                 }, { once: true });
@@ -206,8 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     playButton.addEventListener('click', () => {
                         startPlayback();
                     });
-                } else if (!isIOS || hasUserInteractedWithAudio) {
-                    // Auto-play if not on iOS or if user has already interacted
+                } else {
+                    // Always auto-play on non-iOS devices
                     audio.addEventListener('canplaythrough', startPlayback, { once: true });
                 }
                 
