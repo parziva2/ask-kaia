@@ -277,15 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.userId !== userId) {
             console.log('Message is from another user, adding to chat');
             addMessage(data.message, 'user', data.userName || 'Anonymous');
-            
-            // Request Kaia's response for received messages
-            console.log('Requesting Kaia response for received message');
-            socket.emit('get-response', {
-                message: data.message,
-                userId: data.userId,
-                userName: data.userName,
-                timestamp: data.timestamp
-            });
+            // No longer requesting response here - server will broadcast it
         } else {
             console.log('Message is from current user, skipping');
         }
@@ -294,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('kaia-response', async (data) => {
         try {
             console.log('Received Kaia response:', data);
-            // Only play response if it's for a message we've seen
             if (data.audioUrl && data.text) {
                 console.log('Starting audio playback for URL:', data.audioUrl);
                 try {
@@ -306,6 +297,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                 } catch (error) {
                     console.error('Audio playback error:', error);
+                    // If audio fails to play, show a retry button
+                    const messageDiv = document.querySelector('.message.kaia:last-child');
+                    if (messageDiv && !messageDiv.querySelector('.retry-button')) {
+                        const retryButton = document.createElement('button');
+                        retryButton.className = 'retry-button';
+                        retryButton.textContent = '🔄 Retry Audio';
+                        retryButton.style.cssText = `
+                            background: #ff3366;
+                            color: white;
+                            border: none;
+                            padding: 0.5rem 1rem;
+                            border-radius: 5px;
+                            margin: 0.5rem 0;
+                            cursor: pointer;
+                            font-weight: 600;
+                            width: 100%;
+                        `;
+                        retryButton.addEventListener('click', async () => {
+                            try {
+                                await playAudioResponse(
+                                    data.audioUrl,
+                                    data.text,
+                                    data.originalMessage,
+                                    data.userName
+                                );
+                                retryButton.style.display = 'none';
+                            } catch (retryError) {
+                                console.error('Retry failed:', retryError);
+                            }
+                        });
+                        messageDiv.appendChild(retryButton);
+                    }
                 }
             } else {
                 console.error('Missing audio URL or text in response');
@@ -334,17 +357,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date().toISOString()
             };
             
-            // Send message to all users
-            console.log('Broadcasting message to all users');
+            // Send message and request response in one go
+            console.log('Sending message and requesting response');
             socket.emit('send-message', messageData);
             
             // Add message to local chat
             console.log('Adding message to local chat');
             addMessage(message, 'user', name);
-            
-            // Request Kaia's response
-            console.log('Requesting Kaia response for sent message');
-            socket.emit('get-response', messageData);
             
             messageInput.value = '';
         }
