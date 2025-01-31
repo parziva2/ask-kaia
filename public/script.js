@@ -272,10 +272,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('new-message', (data) => {
+        console.log('Received new message:', data);
         // Only add messages from other users
         if (data.userId !== userId) {
+            console.log('Message is from another user, adding to chat');
             addMessage(data.message, 'user', data.userName || 'Anonymous');
-            // We no longer request Kaia's response here - the sender will do it
+            // Request Kaia's response for messages from other users
+            console.log('Requesting Kaia response for message from other user');
+            socket.emit('get-response', {
+                message: data.message,
+                userId: data.userId,
+                userName: data.userName
+            });
+        } else {
+            console.log('Message is from current user, skipping');
         }
     });
     
@@ -315,20 +325,24 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (message && name) {
             console.log('Sending message:', message);
+            const messageData = {
+                message: message,
+                userId: userId,
+                userName: name
+            };
+            
             // First send the message to all users
-            socket.emit('send-message', {
-                message: message,
-                userId: userId,
-                userName: name
-            });
+            console.log('Broadcasting message to all users:', messageData);
+            socket.emit('send-message', messageData);
+            
             // Add message to local chat
+            console.log('Adding message to local chat');
             addMessage(message, 'user', name);
-            // Then request Kaia's response (only the sender does this)
-            socket.emit('get-response', {
-                message: message,
-                userId: userId,
-                userName: name
-            });
+            
+            // Then request Kaia's response
+            console.log('Requesting Kaia response');
+            socket.emit('get-response', messageData);
+            
             messageInput.value = '';
         }
     });
