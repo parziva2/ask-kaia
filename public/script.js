@@ -271,28 +271,37 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessage('Connection error. Please try again.', 'system', 'System');
     });
 
-    socket.on('message-with-response', async (data) => {
-        console.log('Received message with response:', data);
-        
-        // If it's a message from another user, show it
+    socket.on('new-message', (data) => {
+        console.log('Received new message:', data);
+        // Only add messages from other users
         if (data.userId !== userId) {
-            console.log('Adding message from other user to chat');
+            console.log('Message is from another user, adding to chat');
             addMessage(data.message, 'user', data.userName || 'Anonymous');
+        } else {
+            console.log('Message is from current user, skipping');
         }
-        
-        // Play Kaia's response for everyone
-        if (data.response) {
-            console.log('Playing Kaia response');
-            try {
-                await playAudioResponse(
-                    data.response.audioUrl,
-                    data.response.text,
-                    data.message,
-                    data.userName
-                );
-            } catch (error) {
-                console.error('Error playing audio response:', error);
+    });
+    
+    socket.on('kaia-response', async (data) => {
+        try {
+            console.log('Received Kaia response:', data);
+            if (data.audioUrl && data.text) {
+                console.log('Starting audio playback for URL:', data.audioUrl);
+                try {
+                    await playAudioResponse(
+                        data.audioUrl, 
+                        data.text, 
+                        data.originalMessage,
+                        data.userName
+                    );
+                } catch (error) {
+                    console.error('Audio playback error:', error);
+                }
+            } else {
+                console.error('Missing audio URL or text in response');
             }
+        } catch (error) {
+            console.error('Error handling Kaia response:', error);
         }
     });
     
@@ -308,19 +317,24 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (message && name) {
             console.log('Sending message:', message);
-            
-            // Add message to local chat immediately
-            console.log('Adding message to local chat');
-            addMessage(message, 'user', name);
-            
-            // Send message and wait for response
-            console.log('Sending message to server');
-            socket.emit('process-message', {
+            const messageData = {
                 message: message,
                 userId: userId,
                 userName: name,
                 timestamp: new Date().toISOString()
-            });
+            };
+            
+            // Send message to all users
+            console.log('Broadcasting message to all users');
+            socket.emit('send-message', messageData);
+            
+            // Add message to local chat
+            console.log('Adding message to local chat');
+            addMessage(message, 'user', name);
+            
+            // Request Kaia's response
+            console.log('Requesting Kaia response');
+            socket.emit('get-response', messageData);
             
             messageInput.value = '';
         }
