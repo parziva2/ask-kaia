@@ -274,18 +274,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Only add messages from other users
         if (data.userId !== userId) {
             addMessage(data.message, 'user', data.userName || 'Anonymous');
-            // Request Kaia's response for the received message
-            socket.emit('get-response', {
-                message: data.message,
-                userId: data.userId,
-                userName: data.userName
-            });
         }
     });
     
     socket.on('kaia-response', async (data) => {
         try {
             console.log('Received Kaia response:', data);
+            // Process response regardless of which device sent the original message
             if (data.audioUrl && data.text) {
                 console.log('Starting audio playback for URL:', data.audioUrl);
                 try {
@@ -318,12 +313,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (message && name) {
             console.log('Sending message:', message);
+            // Send message to server
             socket.emit('send-message', {
                 message: message,
                 userId: userId,
                 userName: name
             });
+            // Add message to local chat
             addMessage(message, 'user', name);
+            // Request Kaia's response
+            socket.emit('get-response', {
+                message: message,
+                userId: userId,
+                userName: name
+            });
             messageInput.value = '';
         }
     });
