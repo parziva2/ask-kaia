@@ -107,8 +107,10 @@ document.addEventListener('DOMContentLoaded', () => {
             audio.volume = 1.0;
             
             // iOS Safari specific setup
-            audio.playsinline = true;
-            audio.muted = false;
+            if (isIOS) {
+                audio.playsinline = true;
+                audio.muted = false;
+            }
             
             // Add play button for mobile if needed
             let playButton = null;
@@ -178,6 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                         if (playButton) {
                                             playButton.style.display = 'none';
                                             hasUserInteractedWithAudio = true;
+                                            // Store the interaction state in localStorage
+                                            if (isIOS) {
+                                                localStorage.setItem('hasUserInteractedWithAudio', 'true');
+                                            }
                                         }
                                     })
                                     .catch(error => {
@@ -194,6 +200,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 };
+
+                // Check if we've already interacted with audio
+                if (isIOS) {
+                    hasUserInteractedWithAudio = localStorage.getItem('hasUserInteractedWithAudio') === 'true';
+                }
 
                 audio.addEventListener('canplaythrough', () => {
                     console.log('Audio can play through');
@@ -264,6 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Only add messages from other users
         if (data.userId !== userId) {
             addMessage(data.message, 'user', data.userName || 'Anonymous');
+            // Request Kaia's response for messages from other users
+            socket.emit('get-response', {
+                message: data.message,
+                userId: data.userId,
+                userName: data.userName
+            });
         }
     });
     
