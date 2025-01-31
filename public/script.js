@@ -1,7 +1,9 @@
 // Initialize socket connection with the correct server URL
-const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://ask-kaia.onrender.com', {
-    transports: ['websocket'],
-    upgrade: false
+const socket = io('/', {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -359,15 +361,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date().toISOString()
             };
             
-            // Send message to server
-            console.log('Sending message to server');
-            socket.emit('send-message', messageData);
-            
-            // Add message to local chat
-            console.log('Adding message to local chat');
-            addMessage(message, 'user', name);
-            
-            messageInput.value = '';
+            try {
+                // Send message and wait for acknowledgment
+                socket.emit('send-message', messageData, (error) => {
+                    if (error) {
+                        console.error('Error sending message:', error);
+                        addMessage('Failed to send message. Please try again.', 'system', 'System');
+                        return;
+                    }
+                    
+                    // Add message to local chat
+                    console.log('Message sent successfully');
+                    addMessage(message, 'user', name);
+                    
+                    // Explicitly request Kaia's response
+                    console.log('Requesting Kaia response');
+                    socket.emit('get-response', messageData);
+                });
+                
+                messageInput.value = '';
+            } catch (error) {
+                console.error('Error in message handling:', error);
+                addMessage('Failed to send message. Please try again.', 'system', 'System');
+            }
         }
     });
     
