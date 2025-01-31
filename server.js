@@ -12,12 +12,12 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: ["http://localhost:3000", "https://askkaia.com", "https://www.askkaia.com"],
+        origin: ["http://localhost:3000", "https://askkaia.com", "https://www.askkaia.com", "https://synthetic-woman.onrender.com"],
         methods: ["GET", "POST"],
         credentials: true,
         allowedHeaders: ["Content-Type"]
     },
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
     allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000
@@ -35,9 +35,10 @@ const ttsClient = new textToSpeech.TextToSpeechClient({
 });
 
 app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    origin: ["http://localhost:3000", "https://askkaia.com", "https://www.askkaia.com", "https://synthetic-woman.onrender.com"],
+    methods: ["GET", "POST"],
+    credentials: true,
+    allowedHeaders: ["Content-Type"]
 }));
 app.use(express.json());
 

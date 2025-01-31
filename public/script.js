@@ -1,5 +1,9 @@
 // Initialize socket connection with the correct server URL
-const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://synthetic-woman.onrender.com', {
+const serverUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : window.location.protocol + '//' + window.location.host;
+
+const socket = io(serverUrl, {
     transports: ['polling', 'websocket'],
     reconnection: true,
     reconnectionAttempts: 10,
@@ -7,16 +11,25 @@ const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:3
     reconnectionDelayMax: 5000,
     timeout: 20000,
     autoConnect: true,
-    withCredentials: true
+    withCredentials: true,
+    forceNew: true
 });
 
 // Add connection status handling
 socket.on('connect', () => {
     console.log('Connected to server successfully');
+    console.log('Connection URL:', serverUrl);
 });
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
+    console.log('Failed to connect to:', serverUrl);
+    // Try to reconnect with polling if WebSocket fails
+    if (socket.io.opts.transports.includes('websocket')) {
+        console.log('Falling back to polling transport');
+        socket.io.opts.transports = ['polling'];
+        socket.connect();
+    }
 });
 
 socket.on('disconnect', (reason) => {
