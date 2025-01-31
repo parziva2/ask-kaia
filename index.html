@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sarah's Live Radio Show</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Sarah's Live Radio Show</h1>
+            <div class="controls">
+                <button id="main-play-button">▶️ Start Listening</button>
+                <div class="stats">
+                    <span>Listeners: <span id="listener-count">0</span></span>
+                    <span>Available Slots: <span id="slots-available">3</span></span>
+                </div>
+            </div>
+            <div id="now-playing">Welcome to Sarah's Live Radio Show!</div>
+        </header>
+
+        <main>
+            <div class="live-feed">
+                <div id="live-messages"></div>
+                <div class="question-input">
+                    <input type="text" id="live-question" placeholder="Ask Sarah anything..." maxlength="200">
+                    <button id="send-question">Send Question</button>
+                    <div id="queue-status"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 

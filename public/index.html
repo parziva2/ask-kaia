@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ask Kaia - Interactive AI Experience</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">Ask Kaia</div>
+            <div class="listeners">
+                <span id="listenerCount">0</span> people listening
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Welcome to Ask Kaia</h1>
+                <p class="hero-description">
+                    Join our live AI talk show where Kaia picks the most engaging messages to answer in front of thousands of listeners.
+                    Your message could be the next one featured live - ask something interesting and hear Kaia respond to you in real-time!
+                </p>
+                <div class="features">
+                    <div class="feature">
+                        <span class="feature-icon">🎙️</span>
+                        <h3>Live Talk Show Format</h3>
+                        <p>Your messages compete to be featured and answered live for everyone to hear</p>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">👥</span>
+                        <h3>Live Audience</h3>
+                        <p>Thousands of people listen in real-time as Kaia responds to selected messages</p>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">💡</span>
+                        <h3>Get Featured</h3>
+                        <p>Ask engaging questions or share interesting thoughts to increase your chances of being picked</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="messages-section">
+            <div class="messages-container">
+                <div class="section-header">
+                    <h2>Live Show</h2>
+                    <p>Submit your message and it might be featured next - thousands are listening!</p>
+                </div>
+                <div class="messages" id="messages">
+                    <!-- Messages will appear here -->
+                </div>
+                <div class="message-input">
+                    <div class="input-group">
+                        <input type="text" id="nameInput" placeholder="Your name" maxlength="20">
+                        <input type="text" id="messageInput" placeholder="Type something interesting to get featured live..." maxlength="200">
+                    </div>
+                    <button id="sendMessage" class="send-button">Send Message</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-info">
+                <h3>About Kaia</h3>
+                <p>Kaia is your AI talk show host, engaging with a live audience of thousands. She carefully selects the most interesting messages to feature and respond to, making sure everyone can follow along as she announces which message she's picked to answer next.</p>
+            </div>
+            <div class="footer-tips">
+                <h3>Tips to Get Featured</h3>
+                <ul>
+                    <li>Ask unique and thought-provoking questions</li>
+                    <li>Share personal experiences or insights</li>
+                    <li>Build on the ongoing conversation</li>
+                    <li>Keep your message clear and engaging</li>
+                </ul>
+            </div>
+            <p class="copyright">&copy; 2024 Ask Kaia - An AI Interactive Experience</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html> 
