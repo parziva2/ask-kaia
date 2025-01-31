@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // State management
     let currentAudio = null;
+    let hasUserInteractedWithAudio = false;
     const userId = 'user_' + Math.random().toString(36).substr(2, 9);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     
     // Remove default random name and setup validation
     nameInput.addEventListener('input', () => {
@@ -110,11 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Add play button for mobile if needed
             let playButton = null;
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            if (isIOS) {
+            if (isIOS && !hasUserInteractedWithAudio) {
                 playButton = document.createElement('button');
                 playButton.className = 'play-button';
-                playButton.textContent = '▶️ Play Response';
+                playButton.textContent = '▶️ Listen to Kaia (Enable Audio)';
                 playButton.style.cssText = `
                     background: #ff3366;
                     color: white;
@@ -153,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             messageDiv.appendChild(headerDiv);
             messageDiv.appendChild(contentDiv);
             
-            // Add play button for iOS
+            // Add play button for iOS only if user hasn't interacted yet
             if (playButton) {
                 messageDiv.appendChild(playButton);
             }
@@ -166,6 +167,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 audio.addEventListener('loadeddata', () => {
                     console.log('Audio data loaded');
+                    if (hasUserInteractedWithAudio) {
+                        startPlayback();
+                    }
                 }, { once: true });
 
                 const startPlayback = async () => {
@@ -180,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         console.log('Playback started successfully');
                                         if (playButton) {
                                             playButton.style.display = 'none';
+                                            hasUserInteractedWithAudio = true;
                                         }
                                     })
                                     .catch(error => {
@@ -201,8 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     playButton.addEventListener('click', () => {
                         startPlayback();
                     });
-                } else {
-                    audio.addEventListener('canplaythrough', startPlayback);
+                } else if (!isIOS || hasUserInteractedWithAudio) {
+                    // Auto-play if not on iOS or if user has already interacted
+                    audio.addEventListener('canplaythrough', startPlayback, { once: true });
                 }
                 
                 audio.addEventListener('playing', () => {
@@ -238,10 +244,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }, 10000);
 
-                // Start playback immediately if not iOS
-                if (!playButton) {
-                    audio.load();
-                }
+                // Start loading audio
+                audio.load();
             });
         } catch (error) {
             console.error('Error in playAudioResponse:', error);
