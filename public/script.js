@@ -271,8 +271,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // });
     
     socket.on('new-message', (data) => {
-        // Only add messages from other users or if it's our first time seeing it
-        addMessage(data.message, 'user', data.userName || 'Anonymous');
+        // Only add messages from other users
+        if (data.userId !== userId) {
+            addMessage(data.message, 'user', data.userName || 'Anonymous');
+            // Request Kaia's response for the received message
+            socket.emit('get-response', {
+                message: data.message,
+                userId: data.userId,
+                userName: data.userName
+            });
+        }
     });
     
     socket.on('kaia-response', async (data) => {
@@ -315,6 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 userId: userId,
                 userName: name
             });
+            addMessage(message, 'user', name);
             messageInput.value = '';
         }
     });
