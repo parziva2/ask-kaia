@@ -356,13 +356,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date().toISOString()
             };
             
+            // First broadcast the message
+            console.log('Broadcasting message to all users');
+            socket.emit('broadcast-message', messageData);
+            
             // Add message to local chat
             console.log('Adding message to local chat');
             addMessage(message, 'user', name);
             
-            // Send message and get response in one event
-            console.log('Sending message and requesting response');
-            socket.emit('chat-message', messageData);
+            // Then request Kaia's response
+            console.log('Requesting Kaia response');
+            socket.emit('request-response', messageData);
             
             messageInput.value = '';
         }
