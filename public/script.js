@@ -288,9 +288,36 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Adding message to local chat');
             addMessage(message, 'user', name);
             
-            // Send message to server
-            console.log('Sending message to server');
-            socket.emit('message', messageData);
+            try {
+                // Send message to server using fetch
+                console.log('Requesting response from Kaia');
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(messageData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to get response from server');
+                }
+                
+                const data = await response.json();
+                console.log('Received response:', data);
+                
+                if (data.audioUrl && data.text) {
+                    await playAudioResponse(
+                        data.audioUrl,
+                        data.text,
+                        message,
+                        name
+                    );
+                }
+            } catch (error) {
+                console.error('Error getting response:', error);
+                addMessage('Failed to get response. Please try again.', 'system', 'System');
+            }
             
             // Clear input
             messageInput.value = '';
