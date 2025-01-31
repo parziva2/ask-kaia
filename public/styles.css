@@ -417,6 +417,25 @@ footer {
     .message-input {
         flex-direction: column;
         padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .input-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    #nameInput {
+        width: 100%;
+    }
+    
+    #messageInput {
+        width: 100%;
+    }
+    
+    .send-button {
+        width: 100%;
+        padding: 1rem;
     }
     
     main {
