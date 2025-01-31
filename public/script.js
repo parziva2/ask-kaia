@@ -1,5 +1,10 @@
-// Initialize socket connection
-const socket = io();
+// Initialize socket connection with the correct server URL
+const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://synthetic-woman.onrender.com', {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
