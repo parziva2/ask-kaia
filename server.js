@@ -248,26 +248,16 @@ async function processMessageQueue() {
                     type: 'user',
                     text: topMessage.message,
                     userId: topMessage.userId,
-                    userName: topMessage.userName,
                     timestamp: Date.now()
                 });
                 
-                state.conversationHistory.push({
-                    type: 'kaia',
-                    text: response,
-                    timestamp: Date.now()
-                });
-                
-                // Keep history manageable
-                if (state.conversationHistory.length > 10) {
-                    state.conversationHistory = state.conversationHistory.slice(-10);
-                }
-                
-                // Broadcast to all clients
-                io.emit('kaia-response', {
+                // Broadcast the message and audio to all connected clients
+                io.emit('new_message', {
+                    type: 'response',
                     text: response,
                     audioUrl: audioUrl,
-                    originalMessage: topMessage.message,
+                    timestamp: Date.now(),
+                    userId: topMessage.userId,
                     userName: topMessage.userName
                 });
                 

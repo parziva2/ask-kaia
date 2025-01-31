@@ -817,4 +817,72 @@ socket.on('synchronized-content', (data) => {
             playAudioResponse(data.audioUrl, messageDiv, data.text, data.type);
         }
     }
+});
+
+// Handle incoming messages and audio
+socket.on('new_message', (data) => {
+    // Create message element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'live-message';
+    
+    // Add message content
+    messageDiv.innerHTML = `
+        <div class="radio-segment">
+            <div class="message-content">
+                <div class="user-name">${data.userName}</div>
+                <div class="message">${data.text}</div>
+                <div class="audio-controls">
+                    <button class="play-audio-btn">▶️ Play Audio</button>
+                </div>
+            </div>
+        </div>
+        <div class="meta">
+            <span class="time">${formatTimestamp(data.timestamp)}</span>
+        </div>
+    `;
+    
+    // Add to messages container
+    liveMessages.insertBefore(messageDiv, liveMessages.firstChild);
+    
+    // Limit number of displayed messages
+    while (liveMessages.children.length > MAX_MESSAGES) {
+        liveMessages.removeChild(liveMessages.lastChild);
+    }
+    
+    // Set up audio playback
+    const playButton = messageDiv.querySelector('.play-audio-btn');
+    if (playButton && data.audioUrl) {
+        const audioElement = new Audio(data.audioUrl);
+        
+        playButton.addEventListener('click', () => {
+            if (audioElement.paused) {
+                // Stop any currently playing audio
+                if (currentAudioElement) {
+                    currentAudioElement.pause();
+                    currentAudioElement.currentTime = 0;
+                }
+                
+                // Play this audio
+                audioElement.play()
+                    .then(() => {
+                        playButton.textContent = '⏸️ Pause';
+                        currentAudioElement = audioElement;
+                    })
+                    .catch(error => {
+                        console.error('Error playing audio:', error);
+                        playButton.textContent = '❌ Error';
+                    });
+            } else {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+                playButton.textContent = '▶️ Play Audio';
+            }
+        });
+        
+        // Handle audio completion
+        audioElement.addEventListener('ended', () => {
+            playButton.textContent = '▶️ Play Audio';
+            currentAudioElement = null;
+        });
+    }
 }); 
