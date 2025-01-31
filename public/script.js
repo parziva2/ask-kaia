@@ -5,9 +5,8 @@ const socket = io('https://synthetic-woman.onrender.com', {
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     withCredentials: true,
-    extraHeaders: {
-        'Access-Control-Allow-Origin': window.location.origin
-    }
+    autoConnect: true,
+    forceNew: true
 });
 
 // Add connection status logging
@@ -17,6 +16,12 @@ socket.on('connect', () => {
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
+    // Try to reconnect with polling if WebSocket fails
+    if (socket.io.engine.transport.name === 'websocket') {
+        console.log('Falling back to polling transport');
+        socket.io.opts.transports = ['polling'];
+        socket.connect();
+    }
 });
 
 document.addEventListener('DOMContentLoaded', () => {

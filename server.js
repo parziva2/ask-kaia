@@ -11,45 +11,30 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
-// Unified CORS configuration
-const corsOptions = {
-    origin: function(origin, callback) {
-        const allowedOrigins = [
-            'http://localhost:3000',
-            'https://askkaia.com',
-            'https://www.askkaia.com',
-            'https://synthetic-woman.onrender.com',
-            'http://localhost'
-        ];
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        if (allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.log('Origin not allowed by CORS:', origin);
-            callback(null, true); // Allow all origins temporarily for debugging
-        }
-    },
-    methods: ["GET", "POST", "OPTIONS"],
+// Enable CORS for all routes
+app.use(cors({
+    origin: true,
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
-};
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Apply CORS to Express
-app.use(cors(corsOptions));
-
-// Configure Socket.IO with the same CORS settings
+// Configure Socket.IO
 const io = socketIo(server, {
-    cors: corsOptions,
+    cors: {
+        origin: true,
+        methods: ["GET", "POST"],
+        credentials: true,
+        allowedHeaders: ["Content-Type", "Authorization"]
+    },
     transports: ['polling', 'websocket'],
     allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000
 });
 
-// Add OPTIONS handling for preflight requests
-app.options('*', cors(corsOptions));
+// Handle preflight requests
+app.options('*', cors());
 
 // Configure OpenAI with custom settings
 const openai = new OpenAI({
