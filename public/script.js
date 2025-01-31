@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const audio = new Audio();
             audio.crossOrigin = "anonymous";
             audio.preload = "auto";
-            audio.volume = 1.0;  // Maximum volume
+            audio.volume = 1.0;
             
             // iOS Safari specific setup
             audio.playsinline = true;
@@ -165,17 +165,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return new Promise((resolve, reject) => {
                 let hasStartedPlaying = false;
 
-                audio.addEventListener('loadeddata', () => {
-                    console.log('Audio data loaded');
-                    if (!isIOS || hasUserInteractedWithAudio) {
-                        startPlayback();
-                    }
-                }, { once: true });
-
                 const startPlayback = async () => {
                     if (!hasStartedPlaying) {
                         hasStartedPlaying = true;
-                        console.log('Audio can play through, starting playback');
+                        console.log('Starting playback');
                         try {
                             const playPromise = audio.play();
                             if (playPromise !== undefined) {
@@ -202,13 +195,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
 
+                audio.addEventListener('canplaythrough', () => {
+                    console.log('Audio can play through');
+                    if (!isIOS || hasUserInteractedWithAudio) {
+                        startPlayback();
+                    }
+                }, { once: true });
+
                 if (playButton) {
                     playButton.addEventListener('click', () => {
                         startPlayback();
                     });
-                } else {
-                    // Always auto-play on non-iOS devices
-                    audio.addEventListener('canplaythrough', startPlayback, { once: true });
                 }
                 
                 audio.addEventListener('playing', () => {
@@ -232,9 +229,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     reject(new Error(`Audio error: ${audio.error.message}`));
                 });
 
-                // Set the source after adding event listeners
+                // Set the source and start loading
                 audio.src = audioUrl;
                 currentAudio = audio;
+                audio.load();
 
                 // Set timeout for audio loading
                 setTimeout(() => {
@@ -243,9 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         reject(new Error('Audio loading timeout'));
                     }
                 }, 10000);
-
-                // Start loading audio
-                audio.load();
             });
         } catch (error) {
             console.error('Error in playAudioResponse:', error);
@@ -265,11 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessage('Connection error. Please try again.', 'system', 'System');
     });
 
-    // Remove or comment out the listener-count handler since we're using random numbers
-    // socket.on('listener-count', (count) => {
-    //     listenerCount.textContent = count;
-    // });
-    
     socket.on('new-message', (data) => {
         // Only add messages from other users
         if (data.userId !== userId) {
@@ -280,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('kaia-response', async (data) => {
         try {
             console.log('Received Kaia response:', data);
-            // Process response regardless of which device sent the original message
             if (data.audioUrl && data.text) {
                 console.log('Starting audio playback for URL:', data.audioUrl);
                 try {
@@ -302,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Message handling
-    sendMessage.addEventListener('click', () => {
+    sendMessage.addEventListener('click', async () => {
         if (!validateName()) {
             nameInput.focus();
             return;
