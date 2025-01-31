@@ -275,18 +275,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Only add messages from other users
         if (data.userId !== userId) {
             addMessage(data.message, 'user', data.userName || 'Anonymous');
-            // Request Kaia's response for messages from other users
-            socket.emit('get-response', {
-                message: data.message,
-                userId: data.userId,
-                userName: data.userName
-            });
+            // We no longer request Kaia's response here - the sender will do it
         }
     });
     
     socket.on('kaia-response', async (data) => {
         try {
             console.log('Received Kaia response:', data);
+            // Play audio response for all users who receive it
             if (data.audioUrl && data.text) {
                 console.log('Starting audio playback for URL:', data.audioUrl);
                 try {
@@ -319,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (message && name) {
             console.log('Sending message:', message);
-            // Send message to server
+            // First send the message to all users
             socket.emit('send-message', {
                 message: message,
                 userId: userId,
@@ -327,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             // Add message to local chat
             addMessage(message, 'user', name);
-            // Request Kaia's response
+            // Then request Kaia's response (only the sender does this)
             socket.emit('get-response', {
                 message: message,
                 userId: userId,
