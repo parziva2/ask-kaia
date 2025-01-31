@@ -445,4 +445,24 @@ footer {
     .footer-content {
         grid-template-columns: 1fr;
     }
+}
+
+.play-button {
+    background-color: #ff4b8d;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 5px 15px;
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.play-button:hover {
+    background-color: #e6437f;
+}
+
+.play-button:active {
+    background-color: #cc3c71;
 } 

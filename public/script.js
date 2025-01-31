@@ -1,7 +1,9 @@
 // Initialize socket connection with the correct server URL
 const serverUrl = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
-    : window.location.protocol + '//' + window.location.host;
+    : 'https://synthetic-woman.onrender.com';
+
+console.log('Connecting to server at:', serverUrl);
 
 const socket = io(serverUrl, {
     transports: ['polling', 'websocket'],
@@ -12,20 +14,27 @@ const socket = io(serverUrl, {
     timeout: 20000,
     autoConnect: true,
     withCredentials: true,
-    forceNew: true
+    forceNew: true,
+    path: '/socket.io/',
+    extraHeaders: {
+        'Access-Control-Allow-Origin': window.location.origin
+    }
 });
 
-// Add connection status handling
+// Add detailed connection status handling
 socket.on('connect', () => {
     console.log('Connected to server successfully');
+    console.log('Transport:', socket.io.engine.transport.name);
     console.log('Connection URL:', serverUrl);
 });
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
     console.log('Failed to connect to:', serverUrl);
+    console.log('Current transport:', socket.io.engine.transport.name);
+    
     // Try to reconnect with polling if WebSocket fails
-    if (socket.io.opts.transports.includes('websocket')) {
+    if (socket.io.engine.transport.name === 'websocket') {
         console.log('Falling back to polling transport');
         socket.io.opts.transports = ['polling'];
         socket.connect();
@@ -181,10 +190,14 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             stopCurrentAudio();
             
-            const audio = new Audio(audioUrl);
+            const audio = new Audio();
             audio.crossOrigin = "anonymous";
-            currentAudio = audio;
             
+            // iOS specific handling
+            audio.preload = 'auto';
+            audio.playsinline = true;
+            
+            // Create play button for iOS
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message kaia';
             
@@ -199,8 +212,14 @@ document.addEventListener('DOMContentLoaded', () => {
             timestampSpan.className = 'timestamp';
             timestampSpan.textContent = formatTimestamp(new Date());
             
+            const playButton = document.createElement('button');
+            playButton.className = 'play-button';
+            playButton.innerHTML = '▶️ Play Response';
+            playButton.style.display = 'none'; // Hide initially
+            
             headerDiv.appendChild(nameSpan);
             headerDiv.appendChild(timestampSpan);
+            headerDiv.appendChild(playButton);
             
             const contentDiv = document.createElement('div');
             contentDiv.className = 'content';
@@ -208,21 +227,84 @@ document.addEventListener('DOMContentLoaded', () => {
             
             messageDiv.appendChild(headerDiv);
             messageDiv.appendChild(contentDiv);
-            
             messages.appendChild(messageDiv);
             messages.scrollTop = messages.scrollHeight;
-            
-            await audio.play();
-            
+
+            // Set up audio event handlers
+            audio.addEventListener('canplaythrough', () => {
+                playButton.style.display = 'inline-block';
+            });
+
             audio.addEventListener('ended', () => {
                 currentAudio = null;
+                playButton.innerHTML = '▶️ Play Again';
                 socket.emit('audio-complete');
             });
+
+            audio.addEventListener('error', (e) => {
+                console.error('Audio error:', e);
+                playButton.innerHTML = '❌ Failed to load audio';
+                socket.emit('audio-complete');
+            });
+
+            // Handle play button click
+            playButton.addEventListener('click', async () => {
+                try {
+                    if (currentAudio && currentAudio !== audio) {
+                        stopCurrentAudio();
+                    }
+                    
+                    currentAudio = audio;
+                    
+                    // iOS requires user interaction to play audio
+                    const playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            playButton.innerHTML = '⏸️ Pause';
+                        }).catch((error) => {
+                            console.error('Playback failed:', error);
+                            playButton.innerHTML = '▶️ Play Response';
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error playing audio:', error);
+                    playButton.innerHTML = '▶️ Play Response';
+                }
+            });
+
+            // Set audio source after setting up event handlers
+            audio.src = audioUrl;
+            audio.load();
+
+            // Try autoplay for non-iOS devices
+            if (!isIOS()) {
+                try {
+                    await audio.play();
+                    playButton.innerHTML = '⏸️ Pause';
+                } catch (error) {
+                    console.log('Autoplay failed, showing play button:', error);
+                    playButton.style.display = 'inline-block';
+                }
+            }
+
         } catch (error) {
             console.error('Error in playAudioResponse:', error);
             socket.emit('audio-complete');
             throw error;
         }
+    }
+
+    // Helper function to detect iOS
+    function isIOS() {
+        return [
+            'iPad Simulator',
+            'iPhone Simulator',
+            'iPod Simulator',
+            'iPad',
+            'iPhone',
+            'iPod'
+        ].includes(navigator.platform)
+        || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
     }
 
     // Update listener count initially and every 30 seconds
