@@ -71,12 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('kaia-response', async (data) => {
         try {
             if (data.audioUrl && data.text) {
-                await playAudioResponse(
-                    data.audioUrl, 
-                    data.text, 
-                    data.originalMessage,
-                    data.userName
-                );
+                addMessage(data.text, 'kaia', 'Kaia');
+                await playAudioResponse(data.audioUrl);
             }
         } catch (error) {
             console.error('Error handling Kaia response:', error);
@@ -176,121 +172,37 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function stopCurrentAudio() {
         if (currentAudio) {
-            try {
-                currentAudio.pause();
-                currentAudio.src = '';
-                currentAudio = null;
-            } catch (error) {
-                console.error('Error stopping audio:', error);
-            }
+            currentAudio.pause();
+            currentAudio = null;
         }
     }
     
-    async function playAudioResponse(audioUrl, text, originalMessage, userName) {
+    async function playAudioResponse(audioUrl) {
         try {
             stopCurrentAudio();
             
-            const audio = new Audio();
-            audio.crossOrigin = "anonymous";
+            const audio = new Audio(audioUrl);
+            currentAudio = audio;
             
-            // iOS specific handling
-            audio.preload = 'auto';
-            audio.playsinline = true;
-            
-            // Create play button for iOS
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message kaia';
-            
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'header';
-            
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'name';
-            nameSpan.textContent = 'Kaia';
-            
-            const timestampSpan = document.createElement('span');
-            timestampSpan.className = 'timestamp';
-            timestampSpan.textContent = formatTimestamp(new Date());
-            
-            const playButton = document.createElement('button');
-            playButton.className = 'play-button';
-            playButton.innerHTML = '▶️ Play Response';
-            playButton.style.display = 'none'; // Hide initially
-            
-            headerDiv.appendChild(nameSpan);
-            headerDiv.appendChild(timestampSpan);
-            headerDiv.appendChild(playButton);
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'content';
-            contentDiv.textContent = text;
-            
-            messageDiv.appendChild(headerDiv);
-            messageDiv.appendChild(contentDiv);
-            messages.appendChild(messageDiv);
-            messages.scrollTop = messages.scrollHeight;
-
-            // Set up audio event handlers
-            audio.addEventListener('canplaythrough', () => {
-                playButton.style.display = 'inline-block';
-            });
-
             audio.addEventListener('ended', () => {
                 currentAudio = null;
-                playButton.innerHTML = '▶️ Play Again';
                 socket.emit('audio-complete');
             });
 
             audio.addEventListener('error', (e) => {
                 console.error('Audio error:', e);
-                playButton.innerHTML = '❌ Failed to load audio';
+                currentAudio = null;
                 socket.emit('audio-complete');
             });
 
-            // Handle play button click
-            playButton.addEventListener('click', async () => {
-                try {
-                    if (currentAudio && currentAudio !== audio) {
-                        stopCurrentAudio();
-                    }
-                    
-                    currentAudio = audio;
-                    
-                    // iOS requires user interaction to play audio
-                    const playPromise = audio.play();
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            playButton.innerHTML = '⏸️ Pause';
-                        }).catch((error) => {
-                            console.error('Playback failed:', error);
-                            playButton.innerHTML = '▶️ Play Response';
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error playing audio:', error);
-                    playButton.innerHTML = '▶️ Play Response';
-                }
+            await audio.play().catch((error) => {
+                console.error('Playback failed:', error);
+                socket.emit('audio-complete');
             });
-
-            // Set audio source after setting up event handlers
-            audio.src = audioUrl;
-            audio.load();
-
-            // Try autoplay for non-iOS devices
-            if (!isIOS()) {
-                try {
-                    await audio.play();
-                    playButton.innerHTML = '⏸️ Pause';
-                } catch (error) {
-                    console.log('Autoplay failed, showing play button:', error);
-                    playButton.style.display = 'inline-block';
-                }
-            }
 
         } catch (error) {
             console.error('Error in playAudioResponse:', error);
             socket.emit('audio-complete');
-            throw error;
         }
     }
 
