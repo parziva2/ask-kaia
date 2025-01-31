@@ -1,5 +1,8 @@
-// Initialize socket connection
-const socket = io();
+// Initialize socket connection with the correct server URL
+const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://ask-kaia.onrender.com', {
+    transports: ['websocket'],
+    upgrade: false
+});
 
 document.addEventListener('DOMContentLoaded', () => {
 // DOM Elements
