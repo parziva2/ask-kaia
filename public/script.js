@@ -277,6 +277,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.userId !== userId) {
             console.log('Message is from another user, adding to chat');
             addMessage(data.message, 'user', data.userName || 'Anonymous');
+            
+            // Request Kaia's response for received messages
+            console.log('Requesting Kaia response for received message');
+            socket.emit('get-response', {
+                message: data.message,
+                userId: data.userId,
+                userName: data.userName,
+                timestamp: data.timestamp
+            });
         } else {
             console.log('Message is from current user, skipping');
         }
@@ -285,6 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('kaia-response', async (data) => {
         try {
             console.log('Received Kaia response:', data);
+            // Only play response if it's for a message we've seen
             if (data.audioUrl && data.text) {
                 console.log('Starting audio playback for URL:', data.audioUrl);
                 try {
@@ -333,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage(message, 'user', name);
             
             // Request Kaia's response
-            console.log('Requesting Kaia response');
+            console.log('Requesting Kaia response for sent message');
             socket.emit('get-response', messageData);
             
             messageInput.value = '';
