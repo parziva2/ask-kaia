@@ -277,13 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.userId !== userId) {
             console.log('Message is from another user, adding to chat');
             addMessage(data.message, 'user', data.userName || 'Anonymous');
-            // Request Kaia's response for messages from other users
-            console.log('Requesting Kaia response for message from other user');
-            socket.emit('get-response', {
-                message: data.message,
-                userId: data.userId,
-                userName: data.userName
-            });
         } else {
             console.log('Message is from current user, skipping');
         }
@@ -328,20 +321,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const messageData = {
                 message: message,
                 userId: userId,
-                userName: name
+                userName: name,
+                timestamp: new Date().toISOString()
             };
             
-            // First send the message to all users
-            console.log('Broadcasting message to all users:', messageData);
-            socket.emit('send-message', messageData);
+            // Send message and request response in one event
+            console.log('Sending message and requesting response:', messageData);
+            socket.emit('send-message-and-get-response', messageData);
             
             // Add message to local chat
             console.log('Adding message to local chat');
             addMessage(message, 'user', name);
-            
-            // Then request Kaia's response
-            console.log('Requesting Kaia response');
-            socket.emit('get-response', messageData);
             
             messageInput.value = '';
         }
