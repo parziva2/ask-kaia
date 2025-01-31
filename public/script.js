@@ -61,9 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add message to local chat
             addMessage(message, 'user', name);
             
-            // Send message and request response
+            // Send message to server
             socket.emit('send-message', messageData);
-            socket.emit('get-response', messageData);
             
             messageInput.value = '';
         }
