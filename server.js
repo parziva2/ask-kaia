@@ -11,30 +11,37 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS for all routes
-app.use(cors({
-    origin: true,
-    credentials: true,
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow all origins during development
+        callback(null, true);
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+};
 
-// Configure Socket.IO
+// Enable CORS for all routes with specific options
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
+// Configure Socket.IO with matching CORS settings
 const io = socketIo(server, {
     cors: {
-        origin: true,
-        methods: ["GET", "POST"],
-        credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization"]
+        origin: true, // Allow all origins
+        methods: ['GET', 'POST'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: true
     },
     transports: ['polling', 'websocket'],
     allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000
 });
-
-// Handle preflight requests
-app.options('*', cors());
 
 // Configure OpenAI with custom settings
 const openai = new OpenAI({

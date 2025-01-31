@@ -1,26 +1,42 @@
 // Initialize socket connection with the correct server URL
-const socket = io('https://synthetic-woman.onrender.com', {
+const socket = io('https://ask-kaia.onrender.com', {
     transports: ['polling', 'websocket'],
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 10,
     reconnectionDelay: 1000,
-    withCredentials: true,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
     autoConnect: true,
-    forceNew: true
+    withCredentials: true
 });
 
 // Add connection status logging
 socket.on('connect', () => {
     console.log('Connected to server successfully');
+    document.getElementById('messages').innerHTML += '<div class="system-message success">Connected to server</div>';
 });
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
+    document.getElementById('messages').innerHTML += '<div class="system-message error">Connection error - retrying...</div>';
+    
     // Try to reconnect with polling if WebSocket fails
-    if (socket.io.engine.transport.name === 'websocket') {
+    if (socket.io.engine && socket.io.engine.transport && socket.io.engine.transport.name === 'websocket') {
         console.log('Falling back to polling transport');
         socket.io.opts.transports = ['polling'];
-        socket.connect();
+    }
+});
+
+socket.on('disconnect', (reason) => {
+    console.log('Disconnected from server:', reason);
+    document.getElementById('messages').innerHTML += '<div class="system-message">Disconnected from server - attempting to reconnect...</div>';
+    
+    // Force a reconnection attempt
+    if (!socket.connected) {
+        setTimeout(() => {
+            console.log('Attempting to reconnect...');
+            socket.connect();
+        }, 2000);
     }
 });
 
