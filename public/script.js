@@ -265,6 +265,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // Message handling
+    sendMessage.addEventListener('click', async () => {
+        if (!validateName()) {
+            nameInput.focus();
+            return;
+        }
+        
+        const message = messageInput.value.trim();
+        const name = nameInput.value.trim();
+        
+        if (message && name) {
+            console.log('Sending message:', message);
+            const messageData = {
+                message: message,
+                userId: userId,
+                userName: name,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Add message to local chat immediately
+            console.log('Adding message to local chat');
+            addMessage(message, 'user', name);
+            
+            // Send message to server
+            console.log('Sending message to server');
+            socket.emit('message', messageData);
+            
+            // Clear input
+            messageInput.value = '';
+        }
+    });
+    
+    messageInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            if (!validateName()) {
+                nameInput.focus();
+                return;
+            }
+            sendMessage.click();
+        }
+    });
+
     // Socket event handlers
     socket.on('connect', () => {
         console.log('Connected to server');
@@ -276,18 +318,16 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessage('Connection error. Please try again.', 'system', 'System');
     });
 
-    socket.on('new-message', (data) => {
-        console.log('Received new message:', data);
+    socket.on('message', (data) => {
+        console.log('Received message:', data);
         // Only add messages from other users
         if (data.userId !== userId) {
             console.log('Message is from another user, adding to chat');
             addMessage(data.message, 'user', data.userName || 'Anonymous');
-        } else {
-            console.log('Message is from current user, skipping');
         }
     });
     
-    socket.on('kaia-response', async (data) => {
+    socket.on('response', async (data) => {
         try {
             console.log('Received Kaia response:', data);
             if (data.audioUrl && data.text) {
@@ -339,61 +379,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error handling Kaia response:', error);
-        }
-    });
-    
-    // Message handling
-    sendMessage.addEventListener('click', async () => {
-        if (!validateName()) {
-            nameInput.focus();
-            return;
-        }
-        
-        const message = messageInput.value.trim();
-        const name = nameInput.value.trim();
-        
-        if (message && name) {
-            console.log('Sending message:', message);
-            const messageData = {
-                message: message,
-                userId: userId,
-                userName: name,
-                timestamp: new Date().toISOString()
-            };
-            
-            try {
-                // Send message and wait for acknowledgment
-                socket.emit('send-message', messageData, (error) => {
-                    if (error) {
-                        console.error('Error sending message:', error);
-                        addMessage('Failed to send message. Please try again.', 'system', 'System');
-                        return;
-                    }
-                    
-                    // Add message to local chat
-                    console.log('Message sent successfully');
-                    addMessage(message, 'user', name);
-                    
-                    // Explicitly request Kaia's response
-                    console.log('Requesting Kaia response');
-                    socket.emit('get-response', messageData);
-                });
-                
-                messageInput.value = '';
-            } catch (error) {
-                console.error('Error in message handling:', error);
-                addMessage('Failed to send message. Please try again.', 'system', 'System');
-            }
-        }
-    });
-    
-    messageInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            if (!validateName()) {
-                nameInput.focus();
-                return;
-            }
-            sendMessage.click();
         }
     });
 }); 
