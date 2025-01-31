@@ -16,12 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Socket event handlers
     socket.on('connect', () => {
         console.log('Connected to server');
-        addMessage('Connected to server', 'system', 'System');
     });
     
     socket.on('connect_error', (error) => {
         console.error('Connection error:', error);
-        addMessage('Connection error. Please try again.', 'system', 'System');
     });
 
     socket.on('new-message', (data) => {
@@ -73,14 +71,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date().toISOString()
             };
             
-            // Send message to server
-            socket.emit('send-message', messageData);
-            
-            // Add message to local chat
+            // Add message to local chat first
             addMessage(message, 'user', name);
             
-            // Request Kaia's response
-            socket.emit('get-response', messageData);
+            // Send message and request response
+            socket.emit('message', messageData, (error) => {
+                if (error) {
+                    console.error('Error sending message:', error);
+                    return;
+                }
+                console.log('Message sent successfully');
+            });
             
             messageInput.value = '';
         }
