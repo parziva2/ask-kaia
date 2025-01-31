@@ -498,7 +498,64 @@ async function sendLiveQuestion() {
 // Socket.IO event handlers
 socket.on('connect', () => {
     console.log('Connected to server');
-    socket.emit('register-listener');
+    if (nowPlaying) {
+        nowPlaying.textContent = 'Connected to server';
+    }
+});
+
+socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+    if (nowPlaying) {
+        nowPlaying.textContent = 'Connection error. Retrying...';
+    }
+});
+
+socket.on('error', (error) => {
+    console.error('Server error:', error);
+    if (nowPlaying) {
+        nowPlaying.textContent = error.message || 'An error occurred';
+    }
+});
+
+socket.on('message_received', (data) => {
+    console.log('Message received confirmation:', data);
+});
+
+socket.on('new_response', (data) => {
+    console.log('New response received:', data);
+    
+    // Create message element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'live-message';
+    messageDiv.innerHTML = `
+        <div class="radio-segment">
+            <div class="content">
+                <div class="host-name">Kaia</div>
+                <div class="quoted-question">${data.userName}: "${data.originalMessage}"</div>
+                <div class="answer">${data.text}</div>
+            </div>
+        </div>
+        <div class="meta">
+            <span class="time">${formatTimestamp(data.timestamp)}</span>
+        </div>
+    `;
+
+    // Add to messages container
+    if (liveMessages.firstChild) {
+        liveMessages.insertBefore(messageDiv, liveMessages.firstChild);
+    } else {
+        liveMessages.appendChild(messageDiv);
+    }
+
+    // Play audio if radio is active
+    if (isRadioPlaying && data.audioUrl) {
+        playAudioResponse(data.audioUrl, messageDiv, data.text, 'response');
+    }
+
+    // Trim messages if too many
+    while (liveMessages.children.length > MAX_MESSAGES) {
+        liveMessages.removeChild(liveMessages.lastChild);
+    }
 });
 
 socket.on('listener-count', (count) => {
@@ -565,13 +622,53 @@ if (sendButton) {
     sendButton.addEventListener('click', sendLiveQuestion);
 }
 
-// Remove unnecessary chat functionality
+// Update send message function
 async function sendMessage() {
-    // This function is no longer needed
-    console.log('Chat functionality is disabled');
+    const messageInput = document.getElementById('message-input');
+    const message = messageInput.value.trim();
+    const userName = document.getElementById('name-input')?.value.trim() || 'Anonymous';
+    
+    if (!message) return;
+    
+    try {
+        // Add user message to display
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'live-message user-message';
+        messageDiv.innerHTML = `
+            <div class="user-content">
+                <div class="message">${message}</div>
+            </div>
+            <div class="meta">
+                <span class="time">${formatTimestamp(Date.now())}</span>
+                <span class="user-name">${userName}</span>
+            </div>
+        `;
+        
+        if (liveMessages.firstChild) {
+            liveMessages.insertBefore(messageDiv, liveMessages.firstChild);
+        } else {
+            liveMessages.appendChild(messageDiv);
+        }
+
+        // Emit message to server
+        socket.emit('chat_message', {
+            message,
+            userId: localStorage.getItem('userId'),
+            userName
+        });
+
+        // Clear input
+        messageInput.value = '';
+        
+    } catch (error) {
+        console.error('Error sending message:', error);
+        if (nowPlaying) {
+            nowPlaying.textContent = 'Error sending message. Please try again.';
+        }
+    }
 }
 
-// Remove problematic event listener
+// Remove unnecessary chat functionality
 // document.getElementById('user-message').addEventListener('keypress', function(e) {
 //     if (e.key === 'Enter') {
 //         sendMessage();
@@ -816,73 +913,5 @@ socket.on('synchronized-content', (data) => {
             const messageDiv = addLiveMessage(data);
             playAudioResponse(data.audioUrl, messageDiv, data.text, data.type);
         }
-    }
-});
-
-// Handle incoming messages and audio
-socket.on('new_message', (data) => {
-    // Create message element
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'live-message';
-    
-    // Add message content
-    messageDiv.innerHTML = `
-        <div class="radio-segment">
-            <div class="message-content">
-                <div class="user-name">${data.userName}</div>
-                <div class="message">${data.text}</div>
-                <div class="audio-controls">
-                    <button class="play-audio-btn">▶️ Play Audio</button>
-                </div>
-            </div>
-        </div>
-        <div class="meta">
-            <span class="time">${formatTimestamp(data.timestamp)}</span>
-        </div>
-    `;
-    
-    // Add to messages container
-    liveMessages.insertBefore(messageDiv, liveMessages.firstChild);
-    
-    // Limit number of displayed messages
-    while (liveMessages.children.length > MAX_MESSAGES) {
-        liveMessages.removeChild(liveMessages.lastChild);
-    }
-    
-    // Set up audio playback
-    const playButton = messageDiv.querySelector('.play-audio-btn');
-    if (playButton && data.audioUrl) {
-        const audioElement = new Audio(data.audioUrl);
-        
-        playButton.addEventListener('click', () => {
-            if (audioElement.paused) {
-                // Stop any currently playing audio
-                if (currentAudioElement) {
-                    currentAudioElement.pause();
-                    currentAudioElement.currentTime = 0;
-                }
-                
-                // Play this audio
-                audioElement.play()
-                    .then(() => {
-                        playButton.textContent = '⏸️ Pause';
-                        currentAudioElement = audioElement;
-                    })
-                    .catch(error => {
-                        console.error('Error playing audio:', error);
-                        playButton.textContent = '❌ Error';
-                    });
-            } else {
-                audioElement.pause();
-                audioElement.currentTime = 0;
-                playButton.textContent = '▶️ Play Audio';
-            }
-        });
-        
-        // Handle audio completion
-        audioElement.addEventListener('ended', () => {
-            playButton.textContent = '▶️ Play Audio';
-            currentAudioElement = null;
-        });
     }
 }); 

@@ -451,25 +451,10 @@ body {
 }
 
 .audio-controls {
-    margin-top: 8px;
-}
-
-.play-audio-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 16px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.play-audio-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.play-audio-btn:active {
-    transform: scale(0.98);
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .play-button {
