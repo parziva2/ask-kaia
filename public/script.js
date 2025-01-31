@@ -103,6 +103,30 @@ document.addEventListener('DOMContentLoaded', () => {
             audio.crossOrigin = "anonymous";
             audio.preload = "auto";
             audio.volume = 1.0;  // Maximum volume
+            
+            // iOS Safari specific setup
+            audio.playsinline = true;
+            audio.muted = false;
+            
+            // Add play button for mobile if needed
+            let playButton = null;
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS) {
+                playButton = document.createElement('button');
+                playButton.className = 'play-button';
+                playButton.textContent = '▶️ Play Response';
+                playButton.style.cssText = `
+                    background: #ff3366;
+                    color: white;
+                    border: none;
+                    padding: 0.5rem 1rem;
+                    border-radius: 5px;
+                    margin: 0.5rem 0;
+                    cursor: pointer;
+                    font-weight: 600;
+                    width: 100%;
+                `;
+            }
 
             // Add Kaia's text response as a message
             const messageDiv = document.createElement('div');
@@ -129,6 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
             messageDiv.appendChild(headerDiv);
             messageDiv.appendChild(contentDiv);
             
+            // Add play button for iOS
+            if (playButton) {
+                messageDiv.appendChild(playButton);
+            }
+            
             messages.appendChild(messageDiv);
             messages.scrollTop = messages.scrollHeight;
             
@@ -139,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('Audio data loaded');
                 }, { once: true });
 
-                audio.addEventListener('canplaythrough', () => {
+                const startPlayback = async () => {
                     if (!hasStartedPlaying) {
                         hasStartedPlaying = true;
                         console.log('Audio can play through, starting playback');
@@ -149,9 +178,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 playPromise
                                     .then(() => {
                                         console.log('Playback started successfully');
+                                        if (playButton) {
+                                            playButton.style.display = 'none';
+                                        }
                                     })
                                     .catch(error => {
                                         console.error('Error starting playback:', error);
+                                        if (playButton) {
+                                            playButton.style.display = 'block';
+                                        }
                                         reject(error);
                                     });
                             }
@@ -160,7 +195,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             reject(error);
                         }
                     }
-                });
+                };
+
+                if (playButton) {
+                    playButton.addEventListener('click', () => {
+                        startPlayback();
+                    });
+                } else {
+                    audio.addEventListener('canplaythrough', startPlayback);
+                }
                 
                 audio.addEventListener('playing', () => {
                     console.log('Audio is playing');
@@ -169,14 +212,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 audio.addEventListener('ended', () => {
                     console.log('Audio ended naturally');
                     currentAudio = null;
-                    socket.emit('audio-complete'); // Notify server that audio finished playing
+                    socket.emit('audio-complete');
+                    if (playButton) {
+                        playButton.style.display = 'none';
+                    }
                     resolve();
                 });
                 
                 audio.addEventListener('error', (e) => {
                     console.error('Audio error:', e);
                     console.error('Audio error code:', audio.error.code);
-                    socket.emit('audio-complete'); // Notify server even if there's an error
+                    socket.emit('audio-complete');
                     reject(new Error(`Audio error: ${audio.error.message}`));
                 });
 
@@ -187,14 +233,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Set timeout for audio loading
                 setTimeout(() => {
                     if (!hasStartedPlaying) {
-                        socket.emit('audio-complete'); // Notify server if audio fails to start
+                        socket.emit('audio-complete');
                         reject(new Error('Audio loading timeout'));
                     }
                 }, 10000);
+
+                // Start playback immediately if not iOS
+                if (!playButton) {
+                    audio.load();
+                }
             });
         } catch (error) {
             console.error('Error in playAudioResponse:', error);
-            socket.emit('audio-complete'); // Notify server if there's any error
+            socket.emit('audio-complete');
             throw error;
         }
     }
