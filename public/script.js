@@ -14,16 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userId = 'user_' + Math.random().toString(36).substr(2, 9);
     
     // Socket event handlers
-    socket.on('connect', () => {
-        console.log('Connected to server');
-    });
-    
-    socket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
-    });
-
     socket.on('new-message', (data) => {
-        console.log('Received new message:', data);
         if (data.userId !== userId) {
             addMessage(data.message, 'user', data.userName || 'Anonymous');
         }
@@ -31,21 +22,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     socket.on('kaia-response', async (data) => {
         try {
-            console.log('Received Kaia response:', data);
             if (data.audioUrl && data.text) {
-                console.log('Starting audio playback for URL:', data.audioUrl);
-                try {
-                    await playAudioResponse(
-                        data.audioUrl, 
-                        data.text, 
-                        data.originalMessage,
-                        data.userName
-                    );
-                } catch (error) {
-                    console.error('Audio playback error:', error);
-                }
-            } else {
-                console.error('Missing audio URL or text in response');
+                await playAudioResponse(
+                    data.audioUrl, 
+                    data.text, 
+                    data.originalMessage,
+                    data.userName
+                );
             }
         } catch (error) {
             console.error('Error handling Kaia response:', error);
@@ -63,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const name = nameInput.value.trim();
         
         if (message && name) {
-            console.log('Sending message:', message);
             const messageData = {
                 message: message,
                 userId: userId,
@@ -71,17 +53,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date().toISOString()
             };
             
-            // Add message to local chat first
+            // Add message to local chat
             addMessage(message, 'user', name);
             
             // Send message and request response
-            socket.emit('message', messageData, (error) => {
-                if (error) {
-                    console.error('Error sending message:', error);
-                    return;
-                }
-                console.log('Message sent successfully');
-            });
+            socket.emit('send-message', messageData);
+            socket.emit('get-response', messageData);
             
             messageInput.value = '';
         }
@@ -164,7 +141,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     async function playAudioResponse(audioUrl, text, originalMessage, userName) {
         try {
-            console.log('Starting audio playback for:', audioUrl);
             stopCurrentAudio();
             
             const audio = new Audio(audioUrl);
