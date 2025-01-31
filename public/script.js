@@ -1,5 +1,23 @@
 // Initialize socket connection with the correct server URL
-const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://synthetic-woman.onrender.com');
+const socket = io('https://synthetic-woman.onrender.com', {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    withCredentials: true,
+    extraHeaders: {
+        'Access-Control-Allow-Origin': window.location.origin
+    }
+});
+
+// Add connection status logging
+socket.on('connect', () => {
+    console.log('Connected to server successfully');
+});
+
+socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements

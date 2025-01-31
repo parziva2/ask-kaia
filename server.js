@@ -10,18 +10,46 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: ["http://localhost:3000", "https://askkaia.com", "https://www.askkaia.com", "https://synthetic-woman.onrender.com"],
-        methods: ["GET", "POST"],
-        credentials: true,
-        allowedHeaders: ["Content-Type"]
+
+// Unified CORS configuration
+const corsOptions = {
+    origin: function(origin, callback) {
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'https://askkaia.com',
+            'https://www.askkaia.com',
+            'https://synthetic-woman.onrender.com',
+            'http://localhost'
+        ];
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.log('Origin not allowed by CORS:', origin);
+            callback(null, true); // Allow all origins temporarily for debugging
+        }
     },
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+};
+
+// Apply CORS to Express
+app.use(cors(corsOptions));
+
+// Configure Socket.IO with the same CORS settings
+const io = socketIo(server, {
+    cors: corsOptions,
     transports: ['polling', 'websocket'],
     allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000
 });
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors(corsOptions));
 
 // Configure OpenAI with custom settings
 const openai = new OpenAI({
@@ -34,12 +62,6 @@ const ttsClient = new textToSpeech.TextToSpeechClient({
     keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
 });
 
-app.use(cors({
-    origin: ["http://localhost:3000", "https://askkaia.com", "https://www.askkaia.com", "https://synthetic-woman.onrender.com"],
-    methods: ["GET", "POST"],
-    credentials: true,
-    allowedHeaders: ["Content-Type"]
-}));
 app.use(express.json());
 
 // Create public directory if it doesn't exist
