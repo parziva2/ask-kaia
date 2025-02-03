@@ -12,12 +12,9 @@ const app = express();
 const server = http.createServer(app);
 
 const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow all origins during development
-        callback(null, true);
-    },
+    origin: ['https://askkaia.com', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204
@@ -32,15 +29,16 @@ app.options('*', cors(corsOptions));
 // Configure Socket.IO with matching CORS settings
 const io = socketIo(server, {
     cors: {
-        origin: true, // Allow all origins
+        origin: ['https://askkaia.com', 'http://localhost:3000'],
         methods: ['GET', 'POST'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
         credentials: true
     },
     transports: ['polling', 'websocket'],
     allowEIO3: true,
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
+    path: '/socket.io'
 });
 
 // Configure OpenAI with custom settings
@@ -314,18 +312,19 @@ async function processMessageQueue() {
 
 // Socket connection handling
 io.on('connection', (socket) => {
-    console.log('New client connected');
+    console.log('New client connected:', socket.id);
     state.activeListeners.add(socket.id);
     io.emit('listener-count', state.activeListeners.size);
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+        console.log('Client disconnected:', socket.id, 'Reason:', reason);
         state.activeListeners.delete(socket.id);
         io.emit('listener-count', state.activeListeners.size);
     });
 
     // Handle audio completion signal
     socket.on('audio-complete', () => {
-        console.log('Received audio completion signal');
+        console.log('Received audio completion signal from:', socket.id);
         state.waitingForAudioComplete = false;
         
         // Add a delay before processing the next message
@@ -339,10 +338,10 @@ io.on('connection', (socket) => {
         }, 2000);
     });
 
-    // Handle incoming messages
+    // Handle incoming messages with better logging
     socket.on('send-message', async (data) => {
         try {
-            console.log('Received message:', data.message);
+            console.log('Received message from:', socket.id, 'Message:', data.message);
             
             // Score and queue the message
             const score = scoreMessage(data.message, data.userId);
@@ -353,6 +352,8 @@ io.on('connection', (socket) => {
                 score: score,
                 timestamp: Date.now()
             });
+            
+            console.log('Message queued with score:', score);
             
             // Broadcast the user's message to all clients
             io.emit('new-message', {
@@ -367,6 +368,7 @@ io.on('connection', (socket) => {
             
         } catch (error) {
             console.error('Error handling message:', error);
+            socket.emit('error', { message: 'Error processing your message' });
         }
     });
 });

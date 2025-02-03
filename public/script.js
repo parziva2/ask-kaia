@@ -7,10 +7,11 @@ const socket = io('https://ask-kaia.onrender.com', {
     reconnectionDelayMax: 5000,
     timeout: 20000,
     autoConnect: true,
-    withCredentials: true
+    withCredentials: true,
+    path: '/socket.io'
 });
 
-// Add connection status logging
+// Add connection status logging with more detail
 socket.on('connect', () => {
     console.log('Connected to server successfully');
     document.getElementById('messages').innerHTML += '<div class="system-message success">Connected to server</div>';
@@ -18,7 +19,7 @@ socket.on('connect', () => {
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
-    document.getElementById('messages').innerHTML += '<div class="system-message error">Connection error - retrying...</div>';
+    document.getElementById('messages').innerHTML += '<div class="system-message error">Connection error: ' + error.message + ' - retrying...</div>';
     
     // Try to reconnect with polling if WebSocket fails
     if (socket.io.engine && socket.io.engine.transport && socket.io.engine.transport.name === 'websocket') {
