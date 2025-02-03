@@ -186,11 +186,11 @@ main {
 }
 
 .chat-container {
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(17, 17, 17, 0.95);
     border-radius: 12px;
     padding: 0;
     margin-top: 2rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
 }
 
 .messages {
@@ -215,7 +215,8 @@ main {
 .message-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.25rem;
 }
 
 .message strong {
@@ -233,7 +234,7 @@ main {
 }
 
 .user-message {
-    background: rgba(255, 51, 102, 0.1);
+    background: rgba(255, 51, 102, 0.05);
 }
 
 .ai-message {
@@ -247,6 +248,7 @@ main {
     margin: 0.5rem 0;
     font-size: 0.85rem;
     padding: 0.5rem;
+    display: none;
 }
 
 .system-message.error {
@@ -257,8 +259,8 @@ main {
     display: flex;
     gap: 0.5rem;
     padding: 1rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #name-input {
@@ -288,7 +290,7 @@ main {
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.95rem;
     transition: background-color 0.2s;
 }
@@ -311,7 +313,7 @@ main {
 
 /* Scrollbar styling */
 .messages::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
 }
 
 .messages::-webkit-scrollbar-track {
@@ -320,7 +322,7 @@ main {
 
 .messages::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
 .messages::-webkit-scrollbar-thumb:hover {

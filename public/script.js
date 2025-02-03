@@ -41,13 +41,11 @@ function addSystemMessage(message, type = '') {
 // Socket event handlers
 socket.on('connect', () => {
     console.log('Connected to server successfully');
-    addSystemMessage('Connected to server', 'success');
     processMessageQueue();
 });
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
-    addSystemMessage('Connection error: ' + error.message + ' - retrying...', 'error');
     
     if (socket.io.engine?.transport?.name === 'websocket') {
         console.log('Falling back to polling transport');
@@ -57,7 +55,6 @@ socket.on('connect_error', (error) => {
 
 socket.on('disconnect', (reason) => {
     console.log('Disconnected from server:', reason);
-    addSystemMessage('Disconnected from server - attempting to reconnect...');
     
     if (!socket.connected) {
         setTimeout(() => {
@@ -80,6 +77,7 @@ socket.on('new-message', (data) => {
     
     const userName = document.createElement('strong');
     userName.textContent = data.userName || 'Unknown User';
+    userName.style.color = data.isAI ? '#ff3366' : '#3399ff';
     
     const timestamp = document.createElement('span');
     timestamp.className = 'timestamp';
