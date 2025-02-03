@@ -101,19 +101,43 @@ socket.on('new-message', (data) => {
 // Handle audio playback
 socket.on('play-audio', (data) => {
     console.log('Received audio data:', data);
-    const audio = new Audio(data.audioPath);
+    if (!data.audioPath) {
+        console.error('No audio path received');
+        socket.emit('audio-complete');
+        return;
+    }
+
+    // Ensure the audio path starts with a slash
+    const audioPath = data.audioPath.startsWith('/') ? data.audioPath : '/' + data.audioPath;
+    const audio = new Audio('https://ask-kaia.onrender.com' + audioPath);
+    
+    console.log('Playing audio from:', audio.src);
+    
+    audio.oncanplay = () => {
+        console.log('Audio can play, starting playback');
+        audio.play().catch(error => {
+            console.error('Failed to play audio:', error);
+            socket.emit('audio-complete');
+        });
+    };
+
     audio.onended = () => {
         console.log('Audio playback completed');
         socket.emit('audio-complete');
     };
+
     audio.onerror = (error) => {
         console.error('Audio playback error:', error);
         socket.emit('audio-complete');
     };
-    audio.play().catch(error => {
-        console.error('Failed to play audio:', error);
-        socket.emit('audio-complete');
-    });
+
+    // Add a timeout in case audio fails to load
+    setTimeout(() => {
+        if (audio.paused) {
+            console.log('Audio playback timeout - sending completion signal');
+            socket.emit('audio-complete');
+        }
+    }, 10000);
 });
 
 // Handle errors

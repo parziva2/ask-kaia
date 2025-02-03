@@ -158,219 +158,164 @@ main {
 
 /* Messages Section */
 .messages-section {
-    flex: 1;
-    background: #111;
-    padding: 2rem;
+    padding: 2rem 0;
+    background: #1a1a1a;
     min-height: 400px;
-    margin-bottom: 4rem;
 }
 
-.section-header {
-    text-align: center;
-    margin-bottom: 2rem;
-    color: #fff;
-}
-
-.section-header h2 {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-}
-
-.section-header p {
-    color: #ccc;
+.messages-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1rem;
 }
 
 .chat-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    padding: 1rem;
+    margin-top: 2rem;
 }
 
 .messages {
-    flex: 1;
+    min-height: 300px;
+    max-height: 500px;
     overflow-y: auto;
-    padding: 20px;
-    margin-bottom: 20px;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.message {
+    padding: 0.8rem 1rem;
+    margin: 0.5rem 0;
+    border-radius: 10px;
+    max-width: 85%;
+    word-wrap: break-word;
+    position: relative;
+    font-size: 0.95rem;
+}
+
+.user-message {
+    background: rgba(51, 153, 255, 0.1);
+    margin-left: auto;
+    border-left: 3px solid #3399ff;
+    color: #fff;
+}
+
+.ai-message {
+    background: rgba(255, 51, 102, 0.1);
+    margin-right: auto;
+    border-left: 3px solid #ff3366;
+    color: #fff;
+}
+
+.timestamp {
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.5);
+    margin-right: 8px;
+}
+
+.message strong {
+    color: #ff3366;
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.message-content {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.system-message {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+    margin: 0.5rem 0;
+    font-size: 0.85rem;
+}
+
+.system-message.error {
+    color: #ff4444;
+}
+
+.system-message.success {
+    color: #00C851;
 }
 
 .message-form {
     display: flex;
-    gap: 10px;
-    padding: 10px;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    gap: 0.5rem;
+    margin-top: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 10px;
 }
 
 #name-input {
     width: 150px;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+    padding: 0.8rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    font-size: 0.9rem;
 }
 
 #message-input {
     flex: 1;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+    padding: 0.8rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    font-size: 0.9rem;
 }
 
 .message-form button {
-    padding: 10px 20px;
-    background-color: #ff3366;
+    padding: 0.8rem 1.5rem;
+    background: #ff3366;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 0.9rem;
     transition: background-color 0.2s;
 }
 
 .message-form button:hover {
-    background-color: #ff1a4d;
+    background: #ff1a4d;
 }
 
-.message-form input:focus {
+#name-input::placeholder,
+#message-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+#name-input:focus,
+#message-input:focus {
     outline: none;
     border-color: #ff3366;
-    box-shadow: 0 0 0 2px rgba(255,51,102,0.2);
-}
-
-.message {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    color: #fff;
-    transition: transform 0.2s ease;
-}
-
-.message:hover {
-    transform: translateX(5px);
-}
-
-.message.user {
-    background: rgba(255, 51, 102, 0.1);
-    border-left: 3px solid #ff3366;
-}
-
-.message.kaia {
-    background: rgba(51, 153, 255, 0.1);
-    border-left: 3px solid #3399ff;
-}
-
-.message .header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-}
-
-.message .name {
-    font-weight: 600;
-    color: #ff3366;
-}
-
-.message .timestamp {
-    color: #666;
-}
-
-.message .content {
-    color: #ccc;
-}
-
-.message-input {
-    position: relative;
-    display: flex;
-    gap: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 1.5rem;
-    border-radius: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    margin-bottom: 2rem;
-}
-
-.input-group {
-    flex: 1;
-    display: flex;
-    gap: 1rem;
-}
-
-#nameInput {
-    width: 150px;
-    padding: 1rem;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 51, 102, 0.3);
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-}
-
-#nameInput::placeholder {
-    color: rgba(255, 51, 102, 0.7);
-}
-
-#nameInput:focus {
-    border-color: #ff3366;
-    outline: none;
     box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.2);
 }
 
-#nameInput.error {
-    border-color: #ff3366;
-    box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.2);
-    animation: shake 0.5s;
+/* Scrollbar styling */
+.messages::-webkit-scrollbar {
+    width: 8px;
 }
 
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    75% { transform: translateX(5px); }
+.messages::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
 }
 
-#messageInput {
-    flex: 1;
-    padding: 1rem;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
-    font-size: 1rem;
-    transition: border-color 0.3s ease;
+.messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 51, 102, 0.3);
+    border-radius: 4px;
 }
 
-#messageInput:focus {
-    border-color: #ff3366;
-    outline: none;
-}
-
-#messageInput::placeholder {
-    color: #666;
-}
-
-.send-button {
-    padding: 1rem 2rem;
-    border-radius: 10px;
-    background: #ff3366;
-    color: #fff;
-    border: none;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-}
-
-.send-button:hover {
-    background: #ff1f4f;
-    transform: translateY(-2px);
+.messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 51, 102, 0.5);
 }
 
 /* Footer */
