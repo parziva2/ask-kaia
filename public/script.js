@@ -16,13 +16,13 @@ let isProcessing = false;
 let deviceId = localStorage.getItem('deviceId') || 'device_' + Math.random().toString(36).substr(2, 9);
 localStorage.setItem('deviceId', deviceId);
 
-// Add connection status logging with more detail
+// Socket event handlers
 socket.on('connect', () => {
     console.log('Connected to server successfully');
     const systemMessage = document.createElement('div');
     systemMessage.className = 'system-message success';
     systemMessage.textContent = 'Connected to server';
-    document.getElementById('messages').appendChild(systemMessage);
+    document.getElementById('messages')?.appendChild(systemMessage);
     processMessageQueue();
 });
 
@@ -31,7 +31,7 @@ socket.on('connect_error', (error) => {
     const systemMessage = document.createElement('div');
     systemMessage.className = 'system-message error';
     systemMessage.textContent = 'Connection error: ' + error.message + ' - retrying...';
-    document.getElementById('messages').appendChild(systemMessage);
+    document.getElementById('messages')?.appendChild(systemMessage);
     
     if (socket.io.engine?.transport?.name === 'websocket') {
         console.log('Falling back to polling transport');
@@ -44,7 +44,7 @@ socket.on('disconnect', (reason) => {
     const systemMessage = document.createElement('div');
     systemMessage.className = 'system-message';
     systemMessage.textContent = 'Disconnected from server - attempting to reconnect...';
-    document.getElementById('messages').appendChild(systemMessage);
+    document.getElementById('messages')?.appendChild(systemMessage);
     
     if (!socket.connected) {
         setTimeout(() => {
@@ -58,6 +58,8 @@ socket.on('disconnect', (reason) => {
 socket.on('new-message', (data) => {
     console.log('Received message:', data);
     const messagesDiv = document.getElementById('messages');
+    if (!messagesDiv) return;
+
     const messageDiv = document.createElement('div');
     messageDiv.className = data.isAI ? 'message ai-message' : 'message user-message';
     
@@ -77,7 +79,6 @@ socket.on('new-message', (data) => {
     messageDiv.appendChild(document.createTextNode(': '));
     messageDiv.appendChild(messageContent);
     
-    // Add data attributes for cross-device sync
     messageDiv.dataset.messageId = data.messageId || Date.now().toString();
     messageDiv.dataset.deviceId = data.deviceId || deviceId;
     
@@ -109,7 +110,7 @@ socket.on('error', (error) => {
     const systemMessage = document.createElement('div');
     systemMessage.className = 'system-message error';
     systemMessage.textContent = 'Error: ' + error.message;
-    document.getElementById('messages').appendChild(systemMessage);
+    document.getElementById('messages')?.appendChild(systemMessage);
 });
 
 function processMessageQueue() {
@@ -126,12 +127,11 @@ function processMessageQueue() {
             console.error('Error sending message:', error);
             messageQueue.unshift(message);
         }
-        // Process next message if any
         processMessageQueue();
     });
 }
 
-// Handle form submission
+// Initialize form handling when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     const messageForm = document.getElementById('message-form');
     const messageInput = document.getElementById('message-input');
@@ -142,7 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    messageForm.onsubmit = function(e) {
+    // Handle form submission
+    messageForm.addEventListener('submit', function(e) {
         e.preventDefault();
         console.log('Form submitted');
         
@@ -172,19 +173,29 @@ document.addEventListener('DOMContentLoaded', () => {
             messageInput.value = '';
             messageInput.focus();
         }
-    };
+    });
 
-    // Add keypress handler for Enter key
+    // Handle Enter key press
     messageInput.addEventListener('keypress', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             messageForm.dispatchEvent(new Event('submit'));
         }
     });
-});
 
-// Remove the old form submission handler
-document.getElementById('message-form')?.onsubmit = null;
+    // Update listener count periodically
+    function updateListenerCount() {
+        const listenerCount = document.getElementById('listenerCount');
+        if (listenerCount) {
+            const randomCount = Math.floor(Math.random() * (14000 - 11000 + 1)) + 11000;
+            listenerCount.textContent = randomCount.toLocaleString();
+        }
+    }
+
+    // Update listener count every 30 seconds
+    updateListenerCount();
+    setInterval(updateListenerCount, 30000);
+});
 
 // Add styles
 const style = document.createElement('style');
@@ -238,157 +249,4 @@ style.textContent = `
     margin-left: 5px;
 }
 `;
-document.head.appendChild(style);
-
-document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
-    const messages = document.getElementById('messages');
-    const nameInput = document.getElementById('nameInput');
-    const messageInput = document.getElementById('messageInput');
-    const sendMessage = document.getElementById('sendMessage');
-    const listenerCount = document.getElementById('listenerCount');
-    
-    // State management
-    let currentAudio = null;
-    
-    // Socket event handlers
-    socket.on('new-message', (data) => {
-        if (data.userId !== deviceId) {
-            addMessage(data.message, 'user', data.userName || 'Anonymous');
-        }
-    });
-    
-    socket.on('kaia-response', async (data) => {
-        try {
-            if (data.audioUrl && data.text) {
-                addMessage(data.text, 'kaia', 'Kaia');
-                await playAudioResponse(data.audioUrl);
-            }
-        } catch (error) {
-            console.error('Error handling Kaia response:', error);
-        }
-    });
-    
-    // Message handling
-    sendMessage.addEventListener('click', () => {
-        if (!validateName()) {
-            nameInput.focus();
-            return;
-        }
-        
-        const message = messageInput.value.trim();
-        const name = nameInput.value.trim();
-        
-        if (message && name) {
-            const messageData = {
-                message: message,
-                userId: deviceId,
-                userName: name,
-                timestamp: new Date().toISOString()
-            };
-            
-            // Add message to local chat
-            addMessage(message, 'user', name);
-            
-            // Send message to server
-            socket.emit('send-message', messageData);
-            
-            messageInput.value = '';
-        }
-    });
-    
-    messageInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            if (!validateName()) {
-                nameInput.focus();
-                return;
-            }
-            sendMessage.click();
-        }
-    });
-
-    function validateName() {
-        if (!nameInput.value.trim()) {
-            nameInput.classList.add('error');
-            nameInput.focus();
-            return false;
-        }
-        nameInput.classList.remove('error');
-        return true;
-    }
-
-    function updateListenerCount() {
-        const randomCount = Math.floor(Math.random() * (14000 - 11000 + 1)) + 11000;
-        listenerCount.textContent = randomCount.toLocaleString();
-    }
-
-    function formatTimestamp(date) {
-        return new Date(date).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        });
-    }
-    
-    function addMessage(content, type, name) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${type}`;
-        
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'header';
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'name';
-        nameSpan.textContent = name;
-        
-        const timestampSpan = document.createElement('span');
-        timestampSpan.className = 'timestamp';
-        timestampSpan.textContent = formatTimestamp(new Date());
-        
-        headerDiv.appendChild(nameSpan);
-        headerDiv.appendChild(timestampSpan);
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        contentDiv.textContent = content;
-        
-        messageDiv.appendChild(headerDiv);
-        messageDiv.appendChild(contentDiv);
-        
-        messages.appendChild(messageDiv);
-        messages.scrollTop = messages.scrollHeight;
-    }
-    
-    function stopCurrentAudio() {
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio = null;
-        }
-    }
-    
-    async function playAudioResponse(audioUrl) {
-        try {
-            stopCurrentAudio();
-            
-            const audio = new Audio(audioUrl);
-            currentAudio = audio;
-            
-            audio.addEventListener('ended', () => {
-                currentAudio = null;
-                socket.emit('audio-complete');
-            });
-
-            await audio.play().catch(() => {
-                socket.emit('audio-complete');
-            });
-
-        } catch (error) {
-            console.error('Error in playAudioResponse:', error);
-            socket.emit('audio-complete');
-        }
-    }
-
-    // Update listener count initially and every 30 seconds
-    updateListenerCount();
-    setInterval(updateListenerCount, 30000);
-}); 
+document.head.appendChild(style); 
