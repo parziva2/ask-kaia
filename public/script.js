@@ -11,10 +11,15 @@ const socket = io('https://ask-kaia.onrender.com', {
     path: '/socket.io'
 });
 
+let messageQueue = [];
+let isProcessing = false;
+
 // Add connection status logging with more detail
 socket.on('connect', () => {
     console.log('Connected to server successfully');
     document.getElementById('messages').innerHTML += '<div class="system-message success">Connected to server</div>';
+    // Process any queued messages
+    processMessageQueue();
 });
 
 socket.on('connect_error', (error) => {
@@ -40,6 +45,92 @@ socket.on('disconnect', (reason) => {
         }, 2000);
     }
 });
+
+// Handle incoming messages
+socket.on('new-message', (data) => {
+    console.log('Received message:', data);
+    const messagesDiv = document.getElementById('messages');
+    const messageClass = data.isAI ? 'ai-message' : 'user-message';
+    const userName = data.userName || 'Unknown User';
+    
+    messagesDiv.innerHTML += `
+        <div class="${messageClass}">
+            <strong>${userName}:</strong> ${data.message}
+        </div>
+    `;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+});
+
+// Handle audio playback
+socket.on('play-audio', (data) => {
+    console.log('Received audio data:', data);
+    const audio = new Audio(data.audioPath);
+    audio.onended = () => {
+        console.log('Audio playback completed');
+        socket.emit('audio-complete');
+    };
+    audio.onerror = (error) => {
+        console.error('Audio playback error:', error);
+        socket.emit('audio-complete');
+    };
+    audio.play().catch(error => {
+        console.error('Failed to play audio:', error);
+        socket.emit('audio-complete');
+    });
+});
+
+// Handle errors
+socket.on('error', (error) => {
+    console.error('Server error:', error);
+    document.getElementById('messages').innerHTML += `
+        <div class="system-message error">
+            Error: ${error.message}
+        </div>
+    `;
+});
+
+function processMessageQueue() {
+    if (!socket.connected || isProcessing || messageQueue.length === 0) {
+        return;
+    }
+
+    isProcessing = true;
+    const message = messageQueue.shift();
+    
+    socket.emit('send-message', message, (error) => {
+        isProcessing = false;
+        if (error) {
+            console.error('Error sending message:', error);
+            messageQueue.unshift(message);
+        }
+        // Process next message if any
+        processMessageQueue();
+    });
+}
+
+// Handle form submission
+document.getElementById('message-form').onsubmit = function(e) {
+    e.preventDefault();
+    const messageInput = document.getElementById('message-input');
+    const message = messageInput.value.trim();
+    
+    if (message) {
+        const messageData = {
+            message: message,
+            userId: 'user-' + Date.now(),
+            userName: 'User'
+        };
+
+        if (socket.connected) {
+            socket.emit('send-message', messageData);
+        } else {
+            messageQueue.push(messageData);
+            console.log('Message queued, waiting for connection');
+        }
+
+        messageInput.value = '';
+    }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements

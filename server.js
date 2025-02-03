@@ -76,15 +76,13 @@ ensureDirectories();
 app.use(express.static(publicDir));
 app.use('/audio', express.static(audioDir));
 
-// Global state
+// State management for message processing
 const state = {
-    activeListeners: new Set(),
     messageQueue: [],
-    currentTopic: null,
     isProcessing: false,
-    conversationHistory: [],
-    lastMessageTime: null,
-    waitingForAudioComplete: false
+    waitingForAudioComplete: false,
+    activeListeners: new Set(),
+    lastMessageTime: Date.now()
 };
 
 // Score messages for interest and relevance
@@ -227,83 +225,67 @@ async function generateResponse(message, userName) {
 
 // Process messages from the queue
 async function processMessageQueue() {
-    if (state.isProcessing || state.messageQueue.length === 0 || state.waitingForAudioComplete) {
-        console.log('Queue processing skipped - ' + 
-            (state.isProcessing ? 'already processing' : 
-             state.waitingForAudioComplete ? 'waiting for audio to complete' : 
-             'empty queue'));
+    if (state.isProcessing || state.waitingForAudioComplete || state.messageQueue.length === 0) {
         return;
     }
-    
+
+    state.isProcessing = true;
     try {
-        state.isProcessing = true;
-        state.waitingForAudioComplete = true;
-        console.log('Starting to process message queue. Current queue length:', state.messageQueue.length);
-        
-        // Sort messages by score in descending order
-        state.messageQueue.sort((a, b) => b.score - a.score);
-        
-        // Get the highest scored message
-        const topMessage = state.messageQueue.shift();
-        console.log('Processing message:', topMessage.message);
-        
-        // Generate and broadcast response
-        const response = await generateResponse(topMessage.message, topMessage.userName);
-        if (response) {
-            console.log('Generated response:', response);
-            
+        const messageData = state.messageQueue.shift();
+        console.log('Processing message:', messageData.message);
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4-0125-preview",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are Kaia, a friendly and helpful AI assistant. Keep responses concise but engaging."
+                },
+                {
+                    role: "user",
+                    content: messageData.message
+                }
+            ],
+            max_tokens: 150
+        });
+
+        if (response.choices && response.choices[0]) {
+            const aiResponse = response.choices[0].message.content;
+            console.log('Generated response:', aiResponse);
+
             try {
-                const audioUrl = await generateAudio(response, topMessage.userId);
-                console.log('Generated audio URL:', audioUrl);
-                
-                if (!audioUrl) {
-                    console.error('Failed to generate audio URL');
-                    state.waitingForAudioComplete = false;
-                    return;
+                // Send the text response immediately
+                io.emit('new-message', {
+                    message: aiResponse,
+                    userId: 'kaia',
+                    userName: 'Kaia',
+                    isAI: true
+                });
+
+                // Generate and send audio
+                const audioResponse = await generateAudio(aiResponse, 'kaia');
+                if (audioResponse && audioResponse.audioFilePath) {
+                    io.emit('play-audio', {
+                        audioPath: audioResponse.audioFilePath,
+                        text: aiResponse
+                    });
+                    state.waitingForAudioComplete = true;
                 }
-                
-                // Update conversation history
-                state.conversationHistory.push({
-                    type: 'user',
-                    text: topMessage.message,
-                    userId: topMessage.userId,
-                    userName: topMessage.userName,
-                    timestamp: Date.now()
-                });
-                
-                state.conversationHistory.push({
-                    type: 'kaia',
-                    text: response,
-                    timestamp: Date.now()
-                });
-                
-                // Keep history manageable
-                if (state.conversationHistory.length > 10) {
-                    state.conversationHistory = state.conversationHistory.slice(-10);
-                }
-                
-                // Broadcast to all clients
-                io.emit('kaia-response', {
-                    text: response,
-                    audioUrl: audioUrl,
-                    originalMessage: topMessage.message,
-                    userName: topMessage.userName
-                });
-                
-                // Wait for client to signal audio completion
-                console.log('Waiting for audio playback to complete...');
-                
             } catch (error) {
                 console.error('Error during audio generation or playback:', error);
                 state.waitingForAudioComplete = false;
+                // Send error message to client
+                io.emit('error', { message: 'Error processing audio response' });
             }
         } else {
             console.error('Failed to generate response');
             state.waitingForAudioComplete = false;
+            io.emit('error', { message: 'Failed to generate response' });
         }
     } catch (error) {
         console.error('Error processing message queue:', error);
         state.waitingForAudioComplete = false;
+        io.emit('error', { message: 'Error processing your message' });
     } finally {
         state.isProcessing = false;
         state.lastMessageTime = Date.now();
@@ -327,15 +309,13 @@ io.on('connection', (socket) => {
         console.log('Received audio completion signal from:', socket.id);
         state.waitingForAudioComplete = false;
         
-        // Add a delay before processing the next message
-        setTimeout(() => {
-            if (state.messageQueue.length > 0) {
-                console.log('Processing next message in queue');
-                processMessageQueue();
-            } else {
-                console.log('Queue empty, waiting for new messages');
-            }
-        }, 2000);
+        // Process next message immediately if queue not empty
+        if (state.messageQueue.length > 0) {
+            console.log('Processing next message in queue');
+            processMessageQueue();
+        } else {
+            console.log('Queue empty, waiting for new messages');
+        }
     });
 
     // Handle incoming messages with better logging
@@ -343,27 +323,24 @@ io.on('connection', (socket) => {
         try {
             console.log('Received message from:', socket.id, 'Message:', data.message);
             
-            // Score and queue the message
-            const score = scoreMessage(data.message, data.userId);
+            // Broadcast the user's message to all clients immediately
+            io.emit('new-message', {
+                message: data.message,
+                userId: data.userId,
+                userName: data.userName
+            });
+            
+            // Queue the message for processing
             state.messageQueue.push({
                 message: data.message,
                 userId: data.userId,
                 userName: data.userName,
-                score: score,
                 timestamp: Date.now()
             });
             
-            console.log('Message queued with score:', score);
+            console.log('Message queued, current queue length:', state.messageQueue.length);
             
-            // Broadcast the user's message to all clients
-            io.emit('new-message', {
-                message: data.message,
-                userId: data.userId,
-                userName: data.userName,
-                score: score
-            });
-            
-            // Trigger message processing
+            // Trigger message processing immediately
             processMessageQueue();
             
         } catch (error) {
@@ -373,12 +350,12 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start processing loop with longer interval
+// Start processing loop with shorter interval
 setInterval(() => {
     if (!state.isProcessing && !state.waitingForAudioComplete && state.messageQueue.length > 0) {
         processMessageQueue();
     }
-}, 5000); // Increased to 5 seconds
+}, 3000); // Reduced to 3 seconds
 
 // Health check endpoint
 app.get('/health', (req, res) => {
