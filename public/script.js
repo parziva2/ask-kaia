@@ -109,9 +109,10 @@ socket.on('play-audio', (data) => {
 
     // Ensure the audio path starts with a slash
     const audioPath = data.audioPath.startsWith('/') ? data.audioPath : '/' + data.audioPath;
-    const audio = new Audio('https://ask-kaia.onrender.com' + audioPath);
-    
-    console.log('Playing audio from:', audio.src);
+    const fullAudioUrl = 'https://ask-kaia.onrender.com' + audioPath;
+    console.log('Attempting to play audio from:', fullAudioUrl);
+
+    const audio = new Audio(fullAudioUrl);
     
     audio.oncanplay = () => {
         console.log('Audio can play, starting playback');
@@ -128,13 +129,25 @@ socket.on('play-audio', (data) => {
 
     audio.onerror = (error) => {
         console.error('Audio playback error:', error);
+        console.error('Audio error details:', {
+            error: error,
+            src: audio.src,
+            networkState: audio.networkState,
+            readyState: audio.readyState
+        });
         socket.emit('audio-complete');
     };
 
     // Add a timeout in case audio fails to load
     setTimeout(() => {
         if (audio.paused) {
-            console.log('Audio playback timeout - sending completion signal');
+            console.error('Audio playback timeout - sending completion signal');
+            console.error('Audio state at timeout:', {
+                src: audio.src,
+                networkState: audio.networkState,
+                readyState: audio.readyState,
+                error: audio.error
+            });
             socket.emit('audio-complete');
         }
     }, 10000);

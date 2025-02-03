@@ -188,15 +188,15 @@ async function generateResponse(message, userName) {
         const prompt = `You are Kaia, a friendly AI assistant. Keep responses very concise (1-2 short sentences). Current user: ${userName}. Their message: "${message}"
 
         Guidelines:
-        1. Be friendly but brief
-        2. If asked a question, give a short, focused answer
-        3. If making a statement, acknowledge briefly and ask a simple follow-up
-        4. NEVER write more than 2 sentences
-        5. Keep each sentence short and direct
+        1. Start by acknowledging the user's message briefly
+        2. Then provide a focused, relevant response
+        3. Keep total response under 2 sentences
+        4. Be friendly but direct
 
-        Example format:
-        - "Thanks for sharing about [topic]! What aspect interests you most?"
-        - "That's a great question about [topic]. [Brief, focused answer]"`;
+        Example formats:
+        - "About [topic you mentioned]: [brief, focused response]"
+        - "Regarding your question about [topic]: [concise answer]"
+        - "I understand you're interested in [topic]. [relevant insight/question]"`;
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4-0125-preview",
@@ -242,12 +242,17 @@ async function processMessageQueue() {
 
                 // Generate and send audio
                 const audioResponse = await generateAudio(response, 'kaia');
-                if (audioResponse && audioResponse.audioFilePath) {
+                console.log('Generated audio response:', audioResponse);
+                
+                if (audioResponse) {
                     io.emit('play-audio', {
-                        audioPath: audioResponse.audioFilePath,
+                        audioPath: audioResponse,
                         text: response
                     });
                     state.waitingForAudioComplete = true;
+                } else {
+                    console.error('No audio response generated');
+                    state.waitingForAudioComplete = false;
                 }
             } catch (error) {
                 console.error('Error during audio generation or playback:', error);
