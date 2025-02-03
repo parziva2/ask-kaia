@@ -16,22 +16,38 @@ let isProcessing = false;
 let deviceId = localStorage.getItem('deviceId') || 'device_' + Math.random().toString(36).substr(2, 9);
 localStorage.setItem('deviceId', deviceId);
 
+// Create messages container if it doesn't exist
+function ensureMessagesContainer() {
+    let messagesDiv = document.getElementById('messages');
+    if (!messagesDiv) {
+        messagesDiv = document.createElement('div');
+        messagesDiv.id = 'messages';
+        messagesDiv.className = 'messages';
+        document.querySelector('.chat-container')?.appendChild(messagesDiv);
+    }
+    return messagesDiv;
+}
+
+// Add a system message
+function addSystemMessage(message, type = '') {
+    const messagesDiv = ensureMessagesContainer();
+    const systemMessage = document.createElement('div');
+    systemMessage.className = `system-message ${type}`;
+    systemMessage.textContent = message;
+    messagesDiv.appendChild(systemMessage);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
 // Socket event handlers
 socket.on('connect', () => {
     console.log('Connected to server successfully');
-    const systemMessage = document.createElement('div');
-    systemMessage.className = 'system-message success';
-    systemMessage.textContent = 'Connected to server';
-    document.getElementById('messages')?.appendChild(systemMessage);
+    addSystemMessage('Connected to server', 'success');
     processMessageQueue();
 });
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
-    const systemMessage = document.createElement('div');
-    systemMessage.className = 'system-message error';
-    systemMessage.textContent = 'Connection error: ' + error.message + ' - retrying...';
-    document.getElementById('messages')?.appendChild(systemMessage);
+    addSystemMessage('Connection error: ' + error.message + ' - retrying...', 'error');
     
     if (socket.io.engine?.transport?.name === 'websocket') {
         console.log('Falling back to polling transport');
@@ -41,10 +57,7 @@ socket.on('connect_error', (error) => {
 
 socket.on('disconnect', (reason) => {
     console.log('Disconnected from server:', reason);
-    const systemMessage = document.createElement('div');
-    systemMessage.className = 'system-message';
-    systemMessage.textContent = 'Disconnected from server - attempting to reconnect...';
-    document.getElementById('messages')?.appendChild(systemMessage);
+    addSystemMessage('Disconnected from server - attempting to reconnect...');
     
     if (!socket.connected) {
         setTimeout(() => {
@@ -57,8 +70,7 @@ socket.on('disconnect', (reason) => {
 // Handle incoming messages
 socket.on('new-message', (data) => {
     console.log('Received message:', data);
-    const messagesDiv = document.getElementById('messages');
-    if (!messagesDiv) return;
+    const messagesDiv = ensureMessagesContainer();
 
     const messageDiv = document.createElement('div');
     messageDiv.className = data.isAI ? 'message ai-message' : 'message user-message';
@@ -107,10 +119,7 @@ socket.on('play-audio', (data) => {
 // Handle errors
 socket.on('error', (error) => {
     console.error('Server error:', error);
-    const systemMessage = document.createElement('div');
-    systemMessage.className = 'system-message error';
-    systemMessage.textContent = 'Error: ' + error.message;
-    document.getElementById('messages')?.appendChild(systemMessage);
+    addSystemMessage('Error: ' + error.message, 'error');
 });
 
 function processMessageQueue() {
