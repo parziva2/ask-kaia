@@ -159,7 +159,7 @@ main {
 /* Messages Section */
 .messages-section {
     padding: 2rem 0;
-    background: #1a1a1a;
+    background: #0a0a0a;
     min-height: 400px;
 }
 
@@ -169,117 +169,127 @@ main {
     padding: 0 1rem;
 }
 
+.section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.section-header h1 {
+    color: #fff;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.section-header p {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.1rem;
+}
+
 .chat-container {
     background: rgba(0, 0, 0, 0.3);
-    border-radius: 15px;
-    padding: 1rem;
+    border-radius: 12px;
+    padding: 0;
     margin-top: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .messages {
     min-height: 300px;
     max-height: 500px;
     overflow-y: auto;
-    margin-bottom: 1rem;
     padding: 1rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
 }
 
 .message {
-    padding: 0.8rem 1rem;
-    margin: 0.5rem 0;
-    border-radius: 10px;
-    max-width: 85%;
+    padding: 1rem;
+    margin: 0.25rem 0;
+    border-radius: 8px;
+    max-width: 100%;
     word-wrap: break-word;
     position: relative;
     font-size: 0.95rem;
+    display: flex;
+    flex-direction: column;
 }
 
-.user-message {
-    background: rgba(51, 153, 255, 0.1);
-    margin-left: auto;
-    border-left: 3px solid #3399ff;
-    color: #fff;
-}
-
-.ai-message {
-    background: rgba(255, 51, 102, 0.1);
-    margin-right: auto;
-    border-left: 3px solid #ff3366;
-    color: #fff;
-}
-
-.timestamp {
-    font-size: 0.8em;
-    color: rgba(255, 255, 255, 0.5);
-    margin-right: 8px;
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
 }
 
 .message strong {
     color: #ff3366;
-    font-weight: 600;
-    margin-right: 4px;
+    font-weight: 500;
+}
+
+.message .timestamp {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85rem;
 }
 
 .message-content {
     color: rgba(255, 255, 255, 0.9);
 }
 
+.user-message {
+    background: rgba(255, 51, 102, 0.1);
+}
+
+.ai-message {
+    background: rgba(0, 0, 0, 0.3);
+}
+
 .system-message {
     text-align: center;
-    color: rgba(255, 255, 255, 0.5);
+    color: #00C851;
     font-style: italic;
     margin: 0.5rem 0;
     font-size: 0.85rem;
+    padding: 0.5rem;
 }
 
 .system-message.error {
     color: #ff4444;
 }
 
-.system-message.success {
-    color: #00C851;
-}
-
 .message-form {
     display: flex;
     gap: 0.5rem;
-    margin-top: 1rem;
-    background: rgba(0, 0, 0, 0.2);
     padding: 1rem;
-    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 #name-input {
     width: 150px;
-    padding: 0.8rem 1rem;
+    padding: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.3);
     color: #fff;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
 }
 
 #message-input {
     flex: 1;
-    padding: 0.8rem 1rem;
+    padding: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.3);
     color: #fff;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
 }
 
 .message-form button {
-    padding: 0.8rem 1.5rem;
+    padding: 0 2rem;
     background: #ff3366;
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     transition: background-color 0.2s;
 }
 
@@ -296,26 +306,25 @@ main {
 #message-input:focus {
     outline: none;
     border-color: #ff3366;
-    box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.2);
+    box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.1);
 }
 
 /* Scrollbar styling */
 .messages::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 .messages::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
+    background: transparent;
 }
 
 .messages::-webkit-scrollbar-thumb {
-    background: rgba(255, 51, 102, 0.3);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
 }
 
 .messages::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 51, 102, 0.5);
+    background: rgba(255, 255, 255, 0.2);
 }
 
 /* Footer */

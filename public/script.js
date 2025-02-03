@@ -75,20 +75,28 @@ socket.on('new-message', (data) => {
     const messageDiv = document.createElement('div');
     messageDiv.className = data.isAI ? 'message ai-message' : 'message user-message';
     
-    const timestamp = document.createElement('span');
-    timestamp.className = 'timestamp';
-    timestamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const messageHeader = document.createElement('div');
+    messageHeader.className = 'message-header';
     
     const userName = document.createElement('strong');
     userName.textContent = data.userName || 'Unknown User';
     
-    const messageContent = document.createElement('span');
+    const timestamp = document.createElement('span');
+    timestamp.className = 'timestamp';
+    timestamp.textContent = new Date().toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+    }).toUpperCase();
+    
+    messageHeader.appendChild(userName);
+    messageHeader.appendChild(timestamp);
+    
+    const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
     messageContent.textContent = data.message;
     
-    messageDiv.appendChild(timestamp);
-    messageDiv.appendChild(userName);
-    messageDiv.appendChild(document.createTextNode(': '));
+    messageDiv.appendChild(messageHeader);
     messageDiv.appendChild(messageContent);
     
     messageDiv.dataset.messageId = data.messageId || Date.now().toString();
