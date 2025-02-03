@@ -82,15 +82,13 @@
                     <h2>Live Show</h2>
                     <p>Submit your message and it might be featured next - thousands are listening!</p>
                 </div>
-                <div class="messages" id="messages">
-                    <!-- Messages will appear here -->
-                </div>
-                <div class="message-input">
-                    <div class="input-group">
-                        <input type="text" id="nameInput" placeholder="Your name" maxlength="20">
-                        <input type="text" id="messageInput" placeholder="Type something interesting to get featured live..." maxlength="200">
-                    </div>
-                    <button id="sendMessage" class="send-button">Send Message</button>
+                <div class="chat-container">
+                    <div id="messages" class="messages"></div>
+                    <form id="message-form" class="message-form">
+                        <input type="text" id="name-input" placeholder="Your name" required>
+                        <input type="text" id="message-input" placeholder="Type your message..." required>
+                        <button type="submit">Send</button>
+                    </form>
                 </div>
             </div>
         </section>

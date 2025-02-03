@@ -132,35 +132,59 @@ function processMessageQueue() {
 }
 
 // Handle form submission
-document.getElementById('message-form').onsubmit = function(e) {
-    e.preventDefault();
+document.addEventListener('DOMContentLoaded', () => {
+    const messageForm = document.getElementById('message-form');
     const messageInput = document.getElementById('message-input');
     const nameInput = document.getElementById('name-input');
-    const message = messageInput.value.trim();
-    const name = (nameInput ? nameInput.value.trim() : 'User') || 'User';
-    
-    if (message) {
-        const messageId = Date.now().toString();
-        const messageData = {
-            message: message,
-            userId: 'user-' + messageId,
-            userName: name,
-            messageId: messageId,
-            deviceId: deviceId,
-            timestamp: new Date().toISOString()
-        };
 
-        if (socket.connected) {
-            socket.emit('send-message', messageData);
-        } else {
-            messageQueue.push(messageData);
-            console.log('Message queued, waiting for connection');
-        }
-
-        messageInput.value = '';
-        messageInput.focus();
+    if (!messageForm || !messageInput) {
+        console.error('Required form elements not found!');
+        return;
     }
-};
+
+    messageForm.onsubmit = function(e) {
+        e.preventDefault();
+        console.log('Form submitted');
+        
+        const message = messageInput.value.trim();
+        const name = (nameInput ? nameInput.value.trim() : 'User') || 'User';
+        
+        if (message) {
+            console.log('Sending message:', message);
+            const messageId = Date.now().toString();
+            const messageData = {
+                message: message,
+                userId: 'user-' + messageId,
+                userName: name,
+                messageId: messageId,
+                deviceId: deviceId,
+                timestamp: new Date().toISOString()
+            };
+
+            if (socket.connected) {
+                console.log('Socket connected, sending message directly');
+                socket.emit('send-message', messageData);
+            } else {
+                console.log('Socket not connected, queueing message');
+                messageQueue.push(messageData);
+            }
+
+            messageInput.value = '';
+            messageInput.focus();
+        }
+    };
+
+    // Add keypress handler for Enter key
+    messageInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            messageForm.dispatchEvent(new Event('submit'));
+        }
+    });
+});
+
+// Remove the old form submission handler
+document.getElementById('message-form')?.onsubmit = null;
 
 // Add styles
 const style = document.createElement('style');
