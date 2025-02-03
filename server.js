@@ -185,33 +185,23 @@ async function generateAudio(text, userId) {
 // Generate Kaia's response
 async function generateResponse(message, userName) {
     try {
-        const context = state.conversationHistory.slice(-3).map(msg => 
-            msg.type === 'user' ? `User: ${msg.text}` : `Kaia: ${msg.text}`
-        ).join('\n');
+        const prompt = `You are Kaia, a friendly AI assistant. Keep responses very concise (1-2 short sentences). Current user: ${userName}. Their message: "${message}"
 
-        const prompt = `You are Kaia, an engaging AI host. ${userName} has sent this message: "${message}"
+        Guidelines:
+        1. Be friendly but brief
+        2. If asked a question, give a short, focused answer
+        3. If making a statement, acknowledge briefly and ask a simple follow-up
+        4. NEVER write more than 2 sentences
+        5. Keep each sentence short and direct
 
-        Recent conversation:
-        ${context}
-        
-        Create a natural, conversational response that:
-        1. ALWAYS starts by mentioning both ${userName}'s name and their exact message
-        2. Shows genuine interest and engagement
-        3. Uses a warm and friendly tone
-        4. Provides thoughtful insights
-        5. Encourages further discussion
-        
-        Your response MUST begin with one of these formats (using the exact name and message):
-        - "Responding to ${userName}'s message about '${message}'..."
-        - "${userName} asks '${message}' - let me address that..."
-        - "Interesting question from ${userName} asking '${message}'..."
-        
-        Keep the response concise (2-3 sentences) and natural, as it will be spoken aloud.`;
+        Example format:
+        - "Thanks for sharing about [topic]! What aspect interests you most?"
+        - "That's a great question about [topic]. [Brief, focused answer]"`;
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-0125-preview",
             messages: [{ role: "system", content: prompt }],
-            max_tokens: 150,
+            max_tokens: 100,
             temperature: 0.7,
             presence_penalty: 0.6
         });
@@ -234,47 +224,34 @@ async function processMessageQueue() {
         const messageData = state.messageQueue.shift();
         console.log('Processing message:', messageData.message);
 
-        const response = await openai.chat.completions.create({
-            model: "gpt-4-0125-preview",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are Kaia, a friendly and helpful AI assistant. Keep responses concise but engaging."
-                },
-                {
-                    role: "user",
-                    content: messageData.message
-                }
-            ],
-            max_tokens: 150
-        });
-
-        if (response.choices && response.choices[0]) {
-            const aiResponse = response.choices[0].message.content;
-            console.log('Generated response:', aiResponse);
+        const response = await generateResponse(messageData.message, messageData.userName);
+        
+        if (response) {
+            console.log('Generated response:', response);
 
             try {
                 // Send the text response immediately
                 io.emit('new-message', {
-                    message: aiResponse,
+                    message: response,
                     userId: 'kaia',
                     userName: 'Kaia',
-                    isAI: true
+                    isAI: true,
+                    messageId: Date.now().toString(),
+                    deviceId: 'kaia'
                 });
 
                 // Generate and send audio
-                const audioResponse = await generateAudio(aiResponse, 'kaia');
+                const audioResponse = await generateAudio(response, 'kaia');
                 if (audioResponse && audioResponse.audioFilePath) {
                     io.emit('play-audio', {
                         audioPath: audioResponse.audioFilePath,
-                        text: aiResponse
+                        text: response
                     });
                     state.waitingForAudioComplete = true;
                 }
             } catch (error) {
                 console.error('Error during audio generation or playback:', error);
                 state.waitingForAudioComplete = false;
-                // Send error message to client
                 io.emit('error', { message: 'Error processing audio response' });
             }
         } else {
@@ -292,24 +269,39 @@ async function processMessageQueue() {
     }
 }
 
-// Socket connection handling
+// Socket connection handling with improved reliability
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
+    
+    // Send current state to new client
+    socket.emit('connection-state', {
+        activeListeners: state.activeListeners.size,
+        serverTime: Date.now()
+    });
+    
     state.activeListeners.add(socket.id);
     io.emit('listener-count', state.activeListeners.size);
 
+    // Ping client regularly to check connection
+    const pingInterval = setInterval(() => {
+        socket.emit('ping');
+    }, 30000);
+
+    socket.on('pong', () => {
+        socket.lastPong = Date.now();
+    });
+
     socket.on('disconnect', (reason) => {
         console.log('Client disconnected:', socket.id, 'Reason:', reason);
+        clearInterval(pingInterval);
         state.activeListeners.delete(socket.id);
         io.emit('listener-count', state.activeListeners.size);
     });
 
-    // Handle audio completion signal
     socket.on('audio-complete', () => {
         console.log('Received audio completion signal from:', socket.id);
         state.waitingForAudioComplete = false;
         
-        // Process next message immediately if queue not empty
         if (state.messageQueue.length > 0) {
             console.log('Processing next message in queue');
             processMessageQueue();
@@ -318,19 +310,20 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle incoming messages with better logging
     socket.on('send-message', async (data) => {
         try {
             console.log('Received message from:', socket.id, 'Message:', data.message);
             
-            // Broadcast the user's message to all clients immediately
+            // Broadcast to all clients including sender for cross-device sync
             io.emit('new-message', {
                 message: data.message,
                 userId: data.userId,
-                userName: data.userName
+                userName: data.userName,
+                messageId: data.messageId,
+                deviceId: data.deviceId,
+                timestamp: data.timestamp
             });
             
-            // Queue the message for processing
             state.messageQueue.push({
                 message: data.message,
                 userId: data.userId,
@@ -339,8 +332,6 @@ io.on('connection', (socket) => {
             });
             
             console.log('Message queued, current queue length:', state.messageQueue.length);
-            
-            // Trigger message processing immediately
             processMessageQueue();
             
         } catch (error) {

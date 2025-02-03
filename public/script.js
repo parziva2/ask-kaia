@@ -13,21 +13,27 @@ const socket = io('https://ask-kaia.onrender.com', {
 
 let messageQueue = [];
 let isProcessing = false;
+let deviceId = localStorage.getItem('deviceId') || 'device_' + Math.random().toString(36).substr(2, 9);
+localStorage.setItem('deviceId', deviceId);
 
 // Add connection status logging with more detail
 socket.on('connect', () => {
     console.log('Connected to server successfully');
-    document.getElementById('messages').innerHTML += '<div class="system-message success">Connected to server</div>';
-    // Process any queued messages
+    const systemMessage = document.createElement('div');
+    systemMessage.className = 'system-message success';
+    systemMessage.textContent = 'Connected to server';
+    document.getElementById('messages').appendChild(systemMessage);
     processMessageQueue();
 });
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
-    document.getElementById('messages').innerHTML += '<div class="system-message error">Connection error: ' + error.message + ' - retrying...</div>';
+    const systemMessage = document.createElement('div');
+    systemMessage.className = 'system-message error';
+    systemMessage.textContent = 'Connection error: ' + error.message + ' - retrying...';
+    document.getElementById('messages').appendChild(systemMessage);
     
-    // Try to reconnect with polling if WebSocket fails
-    if (socket.io.engine && socket.io.engine.transport && socket.io.engine.transport.name === 'websocket') {
+    if (socket.io.engine?.transport?.name === 'websocket') {
         console.log('Falling back to polling transport');
         socket.io.opts.transports = ['polling'];
     }
@@ -35,9 +41,11 @@ socket.on('connect_error', (error) => {
 
 socket.on('disconnect', (reason) => {
     console.log('Disconnected from server:', reason);
-    document.getElementById('messages').innerHTML += '<div class="system-message">Disconnected from server - attempting to reconnect...</div>';
+    const systemMessage = document.createElement('div');
+    systemMessage.className = 'system-message';
+    systemMessage.textContent = 'Disconnected from server - attempting to reconnect...';
+    document.getElementById('messages').appendChild(systemMessage);
     
-    // Force a reconnection attempt
     if (!socket.connected) {
         setTimeout(() => {
             console.log('Attempting to reconnect...');
@@ -50,14 +58,30 @@ socket.on('disconnect', (reason) => {
 socket.on('new-message', (data) => {
     console.log('Received message:', data);
     const messagesDiv = document.getElementById('messages');
-    const messageClass = data.isAI ? 'ai-message' : 'user-message';
-    const userName = data.userName || 'Unknown User';
+    const messageDiv = document.createElement('div');
+    messageDiv.className = data.isAI ? 'message ai-message' : 'message user-message';
     
-    messagesDiv.innerHTML += `
-        <div class="${messageClass}">
-            <strong>${userName}:</strong> ${data.message}
-        </div>
-    `;
+    const timestamp = document.createElement('span');
+    timestamp.className = 'timestamp';
+    timestamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    const userName = document.createElement('strong');
+    userName.textContent = data.userName || 'Unknown User';
+    
+    const messageContent = document.createElement('span');
+    messageContent.className = 'message-content';
+    messageContent.textContent = data.message;
+    
+    messageDiv.appendChild(timestamp);
+    messageDiv.appendChild(userName);
+    messageDiv.appendChild(document.createTextNode(': '));
+    messageDiv.appendChild(messageContent);
+    
+    // Add data attributes for cross-device sync
+    messageDiv.dataset.messageId = data.messageId || Date.now().toString();
+    messageDiv.dataset.deviceId = data.deviceId || deviceId;
+    
+    messagesDiv.appendChild(messageDiv);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 });
 
@@ -82,11 +106,10 @@ socket.on('play-audio', (data) => {
 // Handle errors
 socket.on('error', (error) => {
     console.error('Server error:', error);
-    document.getElementById('messages').innerHTML += `
-        <div class="system-message error">
-            Error: ${error.message}
-        </div>
-    `;
+    const systemMessage = document.createElement('div');
+    systemMessage.className = 'system-message error';
+    systemMessage.textContent = 'Error: ' + error.message;
+    document.getElementById('messages').appendChild(systemMessage);
 });
 
 function processMessageQueue() {
@@ -112,13 +135,19 @@ function processMessageQueue() {
 document.getElementById('message-form').onsubmit = function(e) {
     e.preventDefault();
     const messageInput = document.getElementById('message-input');
+    const nameInput = document.getElementById('name-input');
     const message = messageInput.value.trim();
+    const name = (nameInput ? nameInput.value.trim() : 'User') || 'User';
     
     if (message) {
+        const messageId = Date.now().toString();
         const messageData = {
             message: message,
-            userId: 'user-' + Date.now(),
-            userName: 'User'
+            userId: 'user-' + messageId,
+            userName: name,
+            messageId: messageId,
+            deviceId: deviceId,
+            timestamp: new Date().toISOString()
         };
 
         if (socket.connected) {
@@ -129,8 +158,63 @@ document.getElementById('message-form').onsubmit = function(e) {
         }
 
         messageInput.value = '';
+        messageInput.focus();
     }
 };
+
+// Add styles
+const style = document.createElement('style');
+style.textContent = `
+.message {
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 8px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.user-message {
+    background-color: #e3f2fd;
+    margin-left: auto;
+    margin-right: 10px;
+    color: #1565c0;
+}
+
+.ai-message {
+    background-color: #fce4ec;
+    margin-left: 10px;
+    margin-right: auto;
+    color: #c2185b;
+}
+
+.timestamp {
+    font-size: 0.8em;
+    color: #666;
+    margin-right: 8px;
+}
+
+.system-message {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    margin: 5px 0;
+    font-size: 0.9em;
+}
+
+.system-message.error {
+    color: #d32f2f;
+}
+
+.system-message.success {
+    color: #388e3c;
+}
+
+.message-content {
+    display: inline-block;
+    margin-left: 5px;
+}
+`;
+document.head.appendChild(style);
 
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
@@ -142,11 +226,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // State management
     let currentAudio = null;
-    const userId = 'user_' + Math.random().toString(36).substr(2, 9);
     
     // Socket event handlers
     socket.on('new-message', (data) => {
-        if (data.userId !== userId) {
+        if (data.userId !== deviceId) {
             addMessage(data.message, 'user', data.userName || 'Anonymous');
         }
     });
@@ -175,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (message && name) {
             const messageData = {
                 message: message,
-                userId: userId,
+                userId: deviceId,
                 userName: name,
                 timestamp: new Date().toISOString()
             };
