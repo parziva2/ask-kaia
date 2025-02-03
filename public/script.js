@@ -92,7 +92,22 @@ socket.on('new-message', (data) => {
     
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
-    messageContent.textContent = data.message;
+    
+    if (data.isAI && data.message.startsWith('Responding to')) {
+        const messageParts = data.message.split('...');
+        if (messageParts.length > 1) {
+            const responseContext = document.createElement('div');
+            responseContext.style.color = 'rgba(255, 255, 255, 0.5)';
+            responseContext.style.marginBottom = '0.5rem';
+            responseContext.textContent = messageParts[0] + '...';
+            messageContent.appendChild(responseContext);
+            messageContent.appendChild(document.createTextNode(messageParts[1].trim()));
+        } else {
+            messageContent.textContent = data.message;
+        }
+    } else {
+        messageContent.textContent = data.message;
+    }
     
     messageDiv.appendChild(messageHeader);
     messageDiv.appendChild(messageContent);
