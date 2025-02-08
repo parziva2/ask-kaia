@@ -400,33 +400,56 @@ app.post('/upload-audio', upload.single('audio'), async (req, res) => {
         const userId = req.body.userId || 'anonymous';
         const userName = req.body.userName || 'Anonymous';
         
-        // Generate response to the voice message
-        const response = await generateResponse(`I received a voice message from ${userName}. I'll acknowledge their effort to communicate via voice and encourage them to type their message instead, as I'm currently focused on text-based interactions.`, userName);
+        // First, announce receiving the voice message
+        const announcementResponse = await generateResponse(`I've received a voice message from ${userName}. Let me share it with all our listeners and then respond to it.`, userName);
         
-        if (response) {
-            console.log('Generated response:', response);
-            
+        if (announcementResponse) {
+            // Emit the announcement
+            io.emit('new-message', {
+                message: announcementResponse,
+                userId: 'kaia',
+                userName: 'Kaia',
+                isAI: true,
+                messageId: Date.now().toString(),
+                deviceId: 'kaia',
+                timestamp: Date.now()
+            });
+
             try {
-                // Generate audio response
-                const audioResponse = await generateAudio(response, 'kaia');
-                console.log('Generated audio response:', audioResponse);
-                
-                // Emit the response to all clients
-                io.emit('new-message', {
-                    message: response,
-                    userId: 'kaia',
-                    userName: 'Kaia',
-                    isAI: true,
-                    messageId: Date.now().toString(),
-                    deviceId: 'kaia',
-                    timestamp: Date.now()
-                });
-                
-                if (audioResponse) {
+                // Generate and emit audio for the announcement
+                const announcementAudio = await generateAudio(announcementResponse, 'kaia');
+                if (announcementAudio) {
                     io.emit('play-audio', {
-                        audioPath: audioResponse,
-                        text: response
+                        audioPath: announcementAudio,
+                        text: announcementResponse
                     });
+                }
+
+                // Generate response to the voice message
+                const response = await generateResponse(`Thank you for your voice message, ${userName}. I want to acknowledge your effort to communicate through voice. While I'm still learning to process voice messages perfectly, I'm happy to engage with you. Please feel free to type your message as well for the clearest communication.`, userName);
+                
+                if (response) {
+                    console.log('Generated response:', response);
+                    
+                    // Emit the response message
+                    io.emit('new-message', {
+                        message: response,
+                        userId: 'kaia',
+                        userName: 'Kaia',
+                        isAI: true,
+                        messageId: Date.now().toString(),
+                        deviceId: 'kaia',
+                        timestamp: Date.now()
+                    });
+                    
+                    // Generate and emit audio response
+                    const audioResponse = await generateAudio(response, 'kaia');
+                    if (audioResponse) {
+                        io.emit('play-audio', {
+                            audioPath: audioResponse,
+                            text: response
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Error generating audio response:', error);
