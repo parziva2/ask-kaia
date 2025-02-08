@@ -287,62 +287,71 @@ io.on('connection', (socket) => {
     state.activeListeners.add(socket.id);
     io.emit('listener-count', state.activeListeners.size);
 
-    // Ping client regularly to check connection
-    const pingInterval = setInterval(() => {
-        socket.emit('ping');
-    }, 30000);
-
-    socket.on('pong', () => {
-        socket.lastPong = Date.now();
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('Client disconnected:', socket.id, 'Reason:', reason);
-        clearInterval(pingInterval);
-        state.activeListeners.delete(socket.id);
-        io.emit('listener-count', state.activeListeners.size);
-    });
-
-    socket.on('audio-complete', () => {
-        console.log('Received audio completion signal from:', socket.id);
-        state.waitingForAudioComplete = false;
-        
-        if (state.messageQueue.length > 0) {
-            console.log('Processing next message in queue');
-            processMessageQueue();
-        } else {
-            console.log('Queue empty, waiting for new messages');
-        }
-    });
-
     socket.on('send-message', async (data) => {
         try {
             console.log('Received message from:', socket.id, 'Message:', data.message);
             
-            // Broadcast to all clients including sender for cross-device sync
+            // Broadcast user message to all clients
             io.emit('new-message', {
                 message: data.message,
                 userId: data.userId,
                 userName: data.userName,
                 messageId: data.messageId,
                 deviceId: data.deviceId,
-                timestamp: data.timestamp
-            });
-            
-            state.messageQueue.push({
-                message: data.message,
-                userId: data.userId,
-                userName: data.userName,
                 timestamp: Date.now()
             });
             
-            console.log('Message queued, current queue length:', state.messageQueue.length);
-            processMessageQueue();
+            // Generate Kaia's response
+            const response = await generateResponse(data.message, data.userName);
+            console.log('Generated response:', response);
             
+            if (response) {
+                // Send text response
+                io.emit('new-message', {
+                    message: response,
+                    userId: 'kaia',
+                    userName: 'Kaia',
+                    isAI: true,
+                    messageId: Date.now().toString(),
+                    deviceId: 'kaia',
+                    timestamp: Date.now()
+                });
+
+                try {
+                    // Generate and send audio
+                    const audioResponse = await generateAudio(response, 'kaia');
+                    console.log('Generated audio response:', audioResponse);
+                    
+                    if (audioResponse) {
+                        io.emit('play-audio', {
+                            audioPath: audioResponse,
+                            text: response
+                        });
+                    } else {
+                        console.error('No audio response generated');
+                    }
+                } catch (error) {
+                    console.error('Error during audio generation:', error);
+                    socket.emit('error', { message: 'Error generating audio response' });
+                }
+            } else {
+                console.error('Failed to generate response');
+                socket.emit('error', { message: 'Failed to generate response' });
+            }
         } catch (error) {
             console.error('Error handling message:', error);
             socket.emit('error', { message: 'Error processing your message' });
         }
+    });
+
+    socket.on('audio-complete', () => {
+        console.log('Received audio completion signal from:', socket.id);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('Client disconnected:', socket.id, 'Reason:', reason);
+        state.activeListeners.delete(socket.id);
+        io.emit('listener-count', state.activeListeners.size);
     });
 });
 
