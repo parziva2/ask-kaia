@@ -42,8 +42,15 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="logo">Ask Kaia</div>
-            <div class="listeners">
-                <span id="listenerCount">0</span> people listening
+            <div class="stats-container">
+                <div class="stat-item">
+                    <span class="stat-count" id="listenerCount">0</span>
+                    <span class="stat-label">Listening Now</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-count" id="messageCount">0</span>
+                    <span class="stat-label">Messages Today</span>
+                </div>
             </div>
         </div>
     </nav>
@@ -51,11 +58,24 @@
     <main>
         <section class="hero">
             <div class="hero-content">
-                <h1>Welcome to Ask Kaia</h1>
-                <p class="hero-description">
-                    Join our live AI talk show where Kaia picks the most engaging messages to answer in front of thousands of listeners.
-                    Your message could be the next one featured live - ask something interesting and hear Kaia respond to you in real-time!
-                </p>
+                <div class="hero-main">
+                    <h1>Experience the Future of AI Interaction</h1>
+                    <div class="hero-animation">
+                        <div class="pulse-circle"></div>
+                        <div class="live-indicator">🔴 LIVE NOW</div>
+                    </div>
+                    <p class="hero-description">
+                        Join thousands of listeners in real-time as Kaia, our AI host, picks the most intriguing messages to respond to.
+                        Your thoughts could be featured next - be part of this unique interactive experience!
+                    </p>
+                    <div class="cta-container">
+                        <button class="cta-button" id="scrollToChat">Join the Conversation</button>
+                        <div class="social-proof">
+                            <div class="rating">⭐⭐⭐⭐⭐</div>
+                            <span>Loved by <span id="userCount">15,000+</span> users worldwide</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="features">
                     <div class="feature">
                         <span class="feature-icon">🎙️</span>
@@ -76,20 +96,93 @@
             </div>
         </section>
 
+        <section class="engagement-stats">
+            <div class="stat-card">
+                <div class="stat-icon">🎙️</div>
+                <div class="stat-number" id="responsesCount">5,000+</div>
+                <div class="stat-label">AI Responses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-number" id="avgResponseTime">2.5s</div>
+                <div class="stat-label">Avg Response Time</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🌍</div>
+                <div class="stat-number" id="countriesCount">50+</div>
+                <div class="stat-label">Countries</div>
+            </div>
+        </section>
+
         <section class="messages-section">
             <div class="messages-container">
                 <div class="section-header">
                     <h1>Live Show</h1>
                     <p>Submit your message and it might be featured next - thousands are listening!</p>
+                    <div class="message-preview" id="messagePreview">
+                        <div class="preview-content">
+                            <span class="preview-label">Message Preview</span>
+                            <p class="preview-text"></p>
+                            <div class="preview-stats">
+                                <span class="engagement-score">Engagement Score: <span class="score">0</span></span>
+                                <span class="feature-chance">Feature Chance: <span class="chance">0%</span></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="chat-container">
-                    <div id="messages" class="messages"></div>
+                    <div class="active-listeners">
+                        <div class="listener-avatars" id="listenerAvatars"></div>
+                        <span class="typing-indicator"></span>
+                    </div>
+                    <div id="messages" class="messages">
+                        <div class="message-reactions"></div>
+                    </div>
                     <form id="message-form" class="message-form">
-                        <input type="text" id="name-input" placeholder="Your name" required>
-                        <input type="text" id="message-input" placeholder="Type something interesting to get featured live..." required>
+                        <div class="input-container">
+                            <input type="text" id="name-input" placeholder="Your name" required>
+                            <div class="message-input-wrapper">
+                                <input type="text" id="message-input" placeholder="Type something interesting to get featured live..." required>
+                                <div class="input-actions">
+                                    <button type="button" id="voiceRecordBtn" class="action-btn" title="Record Voice Message">
+                                        🎤
+                                    </button>
+                                    <button type="button" id="emojiBtn" class="action-btn" title="Add Emoji">
+                                        😊
+                                    </button>
+                                    <div class="message-length">
+                                        <span id="charCount">0</span>/200
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <button type="submit">Send Message</button>
                     </form>
+                    <div class="voice-recorder-container" id="voiceRecorder">
+                        <div class="recorder-controls">
+                            <div class="recording-time">00:00</div>
+                            <div class="recording-visualizer">
+                                <canvas id="visualizer"></canvas>
+                            </div>
+                            <button class="stop-recording">Stop Recording</button>
+                        </div>
+                    </div>
+                    <div class="emoji-picker" id="emojiPicker"></div>
                 </div>
+                <div class="engagement-tips">
+                    <h3>💡 Message Tips</h3>
+                    <div class="tips-content">
+                        <p class="current-tip">Ask thought-provoking questions to increase your feature chances!</p>
+                        <div class="tip-progress"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="trending-topics">
+            <h2>Trending Topics</h2>
+            <div class="topics-container" id="trendingTopics">
+                <!-- Topics will be dynamically added here -->
             </div>
         </section>
     </main>
@@ -114,5 +207,168 @@
     </footer>
 
     <script src="script.js"></script>
+    <script>
+        // Add scroll to chat functionality
+        document.getElementById('scrollToChat').addEventListener('click', () => {
+            document.querySelector('.messages-section').scrollIntoView({ 
+                behavior: 'smooth'
+            });
+        });
+
+        // Animate statistics
+        function animateNumber(element, target, duration = 2000) {
+            let start = 0;
+            const increment = target / (duration / 16);
+            const timer = setInterval(() => {
+                start += increment;
+                if (start >= target) {
+                    clearInterval(timer);
+                    start = target;
+                }
+                element.textContent = Math.floor(start).toLocaleString();
+            }, 16);
+        }
+
+        // Initialize animations when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            animateNumber(document.getElementById('messageCount'), 1500);
+            animateNumber(document.getElementById('responsesCount').querySelector('.stat-number'), 5000);
+            
+            // Update user count periodically
+            setInterval(() => {
+                const currentUsers = parseInt(document.getElementById('userCount').textContent);
+                const newUsers = currentUsers + Math.floor(Math.random() * 100);
+                document.getElementById('userCount').textContent = newUsers.toLocaleString() + '+';
+            }, 30000);
+        });
+
+        // Initialize voice recording functionality
+        let mediaRecorder;
+        let audioChunks = [];
+        
+        document.getElementById('voiceRecordBtn').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const voiceRecorder = document.getElementById('voiceRecorder');
+                voiceRecorder.style.display = 'block';
+                
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    // Send audio message
+                    socket.emit('voice-message', { 
+                        audio: audioUrl,
+                        userId: localStorage.getItem('userId'),
+                        userName: document.getElementById('name-input').value
+                    });
+                    voiceRecorder.style.display = 'none';
+                };
+                
+                mediaRecorder.start();
+                startVisualization(stream);
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                alert('Unable to access microphone. Please check your permissions.');
+            }
+        });
+
+        // Message preview system
+        const messageInput = document.getElementById('message-input');
+        const preview = document.getElementById('messagePreview');
+        
+        messageInput.addEventListener('input', () => {
+            const text = messageInput.value;
+            const previewText = preview.querySelector('.preview-text');
+            const score = preview.querySelector('.score');
+            const chance = preview.querySelector('.chance');
+            
+            previewText.textContent = text;
+            
+            // Calculate engagement score based on message content
+            let engagementScore = calculateEngagementScore(text);
+            score.textContent = engagementScore;
+            
+            // Calculate feature chance
+            let featureChance = Math.min(engagementScore * 5, 100);
+            chance.textContent = `${featureChance}%`;
+            
+            preview.style.display = text ? 'block' : 'none';
+        });
+
+        function calculateEngagementScore(text) {
+            let score = 0;
+            
+            // Length bonus
+            score += Math.min(text.length / 20, 5);
+            
+            // Question bonus
+            if (text.includes('?')) score += 5;
+            
+            // Interesting keywords bonus
+            const keywords = ['why', 'how', 'what if', 'imagine', 'think', 'feel', 'believe'];
+            keywords.forEach(word => {
+                if (text.toLowerCase().includes(word)) score += 2;
+            });
+            
+            return Math.round(score);
+        }
+
+        // Add rotating tips
+        const tips = [
+            "Ask thought-provoking questions to increase your feature chances!",
+            "Share personal experiences to make your message unique!",
+            "Build on ongoing conversations for better engagement!",
+            "Keep your message clear and concise for better impact!",
+            "Use emojis sparingly to enhance your message! 😊"
+        ];
+        
+        let currentTipIndex = 0;
+        const tipElement = document.querySelector('.current-tip');
+        const tipProgress = document.querySelector('.tip-progress');
+        
+        function rotateTips() {
+            currentTipIndex = (currentTipIndex + 1) % tips.length;
+            tipElement.style.opacity = 0;
+            
+            setTimeout(() => {
+                tipElement.textContent = tips[currentTipIndex];
+                tipElement.style.opacity = 1;
+                tipProgress.style.width = '100%';
+            }, 500);
+            
+            tipProgress.style.width = '0%';
+        }
+        
+        setInterval(rotateTips, 5000);
+
+        // Initialize trending topics
+        function updateTrendingTopics() {
+            const topics = [
+                { name: "AI Ethics", count: 128 },
+                { name: "Future Tech", count: 95 },
+                { name: "Creativity", count: 82 },
+                { name: "Innovation", count: 76 },
+                { name: "Science", count: 63 }
+            ];
+            
+            const topicsContainer = document.getElementById('trendingTopics');
+            topicsContainer.innerHTML = topics.map(topic => `
+                <div class="topic-item">
+                    <span class="topic-name">#${topic.name}</span>
+                    <span class="topic-count">${topic.count}</span>
+                </div>
+            `).join('');
+        }
+        
+        updateTrendingTopics();
+        setInterval(updateTrendingTopics, 30000);
+    </script>
 </body>
 </html> 
