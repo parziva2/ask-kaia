@@ -401,7 +401,7 @@ app.post('/upload-audio', upload.single('audio'), async (req, res) => {
         const userName = req.body.userName || 'Anonymous';
         
         // Generate response to the voice message
-        const response = await generateResponse(`Voice message from ${userName}`, userName);
+        const response = await generateResponse(`I received a voice message from ${userName}. I'll acknowledge their effort to communicate via voice and encourage them to type their message instead, as I'm currently focused on text-based interactions.`, userName);
         
         if (response) {
             console.log('Generated response:', response);

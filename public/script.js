@@ -49,6 +49,13 @@ function initializeAudioRecording() {
 
     recordButton.addEventListener('click', async () => {
         try {
+            // Show warning about voice message limitations
+            const proceed = confirm("Note: Voice messages are currently in beta. For the best experience, please type your message instead. Do you still want to proceed with voice recording?");
+            
+            if (!proceed) {
+                return;
+            }
+            
             console.log('Requesting microphone access...');
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             console.log('Microphone access granted');
@@ -110,7 +117,7 @@ function initializeAudioRecording() {
                     }
                 } catch (error) {
                     console.error('Error uploading audio:', error);
-                    alert('Error uploading audio. Please try again.');
+                    alert('Error uploading audio. Please type your message instead.');
                 }
             };
             
@@ -121,7 +128,7 @@ function initializeAudioRecording() {
             
         } catch (error) {
             console.error('Error accessing microphone:', error);
-            alert('Unable to access microphone. Please check your permissions.');
+            alert('Unable to access microphone. Please type your message instead.');
             // Reset UI
             audioControls.style.display = 'none';
             recordButton.style.display = 'block';
