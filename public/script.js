@@ -38,14 +38,110 @@ function addSystemMessage(message, type = '') {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// Socket event handlers
+// Initialize form handling when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const nameInput = document.getElementById('name-input');
+
+    if (!messageForm || !messageInput || !nameInput) {
+        console.error('Required form elements not found!');
+        return;
+    }
+
+    // Handle form submission
+    messageForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('Form submitted');
+        
+        const message = messageInput.value.trim();
+        const name = nameInput.value.trim() || 'Anonymous';
+        
+        if (message) {
+            console.log('Sending message:', message);
+            const messageId = Date.now().toString();
+            const messageData = {
+                message: message,
+                userId: localStorage.getItem('userId') || 'user-' + messageId,
+                userName: name,
+                messageId: messageId,
+                deviceId: deviceId,
+                timestamp: new Date().toISOString()
+            };
+
+            // Add user message to the feed immediately
+            const messagesDiv = ensureMessagesContainer();
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'message user-message';
+            userMessageDiv.innerHTML = `
+                <div class="message-header">
+                    <strong style="color: #3399ff">${name}</strong>
+                    <span class="timestamp">${new Date().toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: true 
+                    }).toUpperCase()}</span>
+                </div>
+                <div class="message-content">${message}</div>
+            `;
+            messagesDiv.appendChild(userMessageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Send message to server
+            if (socket.connected) {
+                console.log('Socket connected, sending message directly');
+                socket.emit('send-message', messageData, (error) => {
+                    if (error) {
+                        console.error('Error sending message:', error);
+                        addSystemMessage('Error sending message. Please try again.', 'error');
+                    } else {
+                        console.log('Message sent successfully');
+                        messageInput.value = '';
+                        messageInput.focus();
+                    }
+                });
+            } else {
+                console.log('Socket not connected, queueing message');
+                messageQueue.push(messageData);
+                messageInput.value = '';
+                messageInput.focus();
+                addSystemMessage('Message queued. Waiting for connection...', 'info');
+            }
+        }
+    });
+
+    // Handle Enter key press
+    messageInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            messageForm.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // Update listener count periodically
+    function updateListenerCount() {
+        const listenerCount = document.getElementById('listenerCount');
+        if (listenerCount) {
+            const randomCount = Math.floor(Math.random() * (14000 - 11000 + 1)) + 11000;
+            listenerCount.textContent = randomCount.toLocaleString();
+        }
+    }
+
+    // Update listener count every 30 seconds
+    updateListenerCount();
+    setInterval(updateListenerCount, 30000);
+});
+
+// Socket event handlers with improved logging
 socket.on('connect', () => {
     console.log('Connected to server successfully');
+    addSystemMessage('Connected to server', 'success');
     processMessageQueue();
 });
 
 socket.on('connect_error', (error) => {
     console.error('Connection error:', error);
+    addSystemMessage('Connection error. Retrying...', 'error');
     
     if (socket.io.engine?.transport?.name === 'websocket') {
         console.log('Falling back to polling transport');
@@ -55,6 +151,7 @@ socket.on('connect_error', (error) => {
 
 socket.on('disconnect', (reason) => {
     console.log('Disconnected from server:', reason);
+    addSystemMessage('Disconnected from server. Attempting to reconnect...', 'error');
     
     if (!socket.connected) {
         setTimeout(() => {
@@ -64,7 +161,7 @@ socket.on('disconnect', (reason) => {
     }
 });
 
-// Handle incoming messages
+// Handle incoming messages with improved logging
 socket.on('new-message', (data) => {
     console.log('Received message:', data);
     const messagesDiv = ensureMessagesContainer();
@@ -197,72 +294,6 @@ function processMessageQueue() {
         processMessageQueue();
     });
 }
-
-// Initialize form handling when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    const messageForm = document.getElementById('message-form');
-    const messageInput = document.getElementById('message-input');
-    const nameInput = document.getElementById('name-input');
-
-    if (!messageForm || !messageInput) {
-        console.error('Required form elements not found!');
-        return;
-    }
-
-    // Handle form submission
-    messageForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        console.log('Form submitted');
-        
-        const message = messageInput.value.trim();
-        const name = (nameInput ? nameInput.value.trim() : 'User') || 'User';
-        
-        if (message) {
-            console.log('Sending message:', message);
-            const messageId = Date.now().toString();
-            const messageData = {
-                message: message,
-                userId: 'user-' + messageId,
-                userName: name,
-                messageId: messageId,
-                deviceId: deviceId,
-                timestamp: new Date().toISOString()
-            };
-
-            if (socket.connected) {
-                console.log('Socket connected, sending message directly');
-                socket.emit('send-message', messageData);
-            } else {
-                console.log('Socket not connected, queueing message');
-                messageQueue.push(messageData);
-            }
-
-            messageInput.value = '';
-            messageInput.focus();
-        }
-    });
-
-    // Handle Enter key press
-    messageInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            messageForm.dispatchEvent(new Event('submit'));
-        }
-    });
-
-    // Update listener count periodically
-    function updateListenerCount() {
-        const listenerCount = document.getElementById('listenerCount');
-        if (listenerCount) {
-            const randomCount = Math.floor(Math.random() * (14000 - 11000 + 1)) + 11000;
-            listenerCount.textContent = randomCount.toLocaleString();
-        }
-    }
-
-    // Update listener count every 30 seconds
-    updateListenerCount();
-    setInterval(updateListenerCount, 30000);
-});
 
 // Add styles
 const style = document.createElement('style');
