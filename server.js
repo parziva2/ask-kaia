@@ -6,6 +6,7 @@ const socketIo = require('socket.io');
 const textToSpeech = require('@google-cloud/text-to-speech');
 const fs = require('fs').promises;
 const path = require('path');
+const multer = require('multer');
 require('dotenv').config();
 
 const app = express();
@@ -366,6 +367,60 @@ setInterval(() => {
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
+});
+
+// Add multer for handling file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, audioDir)
+    },
+    filename: function (req, file, cb) {
+        cb(null, 'voice-' + Date.now() + '.wav')
+    }
+});
+const upload = multer({ storage: storage });
+
+// Handle audio uploads
+app.post('/upload-audio', upload.single('audio'), async (req, res) => {
+    try {
+        if (!req.file) {
+            throw new Error('No audio file received');
+        }
+
+        const userId = req.body.userId || 'anonymous';
+        const userName = req.body.userName || 'Anonymous';
+        
+        // Generate response to the voice message
+        const response = await generateResponse(`Voice message from ${userName}`, userName);
+        
+        if (response) {
+            // Generate audio response
+            const audioResponse = await generateAudio(response, 'kaia');
+            
+            // Emit the response to all clients
+            io.emit('new-message', {
+                message: response,
+                userId: 'kaia',
+                userName: 'Kaia',
+                isAI: true,
+                messageId: Date.now().toString(),
+                deviceId: 'kaia',
+                timestamp: Date.now()
+            });
+            
+            if (audioResponse) {
+                io.emit('play-audio', {
+                    audioPath: audioResponse,
+                    text: response
+                });
+            }
+        }
+        
+        res.json({ success: true, message: 'Voice message processed successfully' });
+    } catch (error) {
+        console.error('Error processing voice message:', error);
+        res.status(500).json({ success: false, message: 'Error processing voice message' });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
