@@ -27,7 +27,7 @@
         gtag('config', 'G-23LN21YE8K');
     </script>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <!-- Twitter conversion tracking base code -->
     <script>
@@ -59,23 +59,17 @@
         <section class="hero">
             <div class="hero-content">
                 <div class="hero-main">
+                    <div class="live-indicator">
+                        <span>LIVE NOW</span>
+                    </div>
                     <h1>Experience the Future of AI Interaction</h1>
-                    <div class="hero-animation">
-                        <div class="pulse-circle"></div>
-                        <div class="live-indicator">🔴 LIVE NOW</div>
-                    </div>
                     <p class="hero-description">
-                        Join thousands of listeners in real-time as Kaia, our AI host, picks the most intriguing messages to respond to.
-                        Your thoughts could be featured next - be part of this unique interactive experience!
+                        Join thousands of listeners in real-time as Kaia, our AI host, picks the most intriguing
+                        messages to respond to. Your thoughts could be featured next - be part of this unique
+                        interactive experience!
                     </p>
-                    <div class="cta-container">
-                        <button class="cta-button" id="scrollToChat">Join the Conversation</button>
-                        <div class="social-proof">
-                            <div class="rating">⭐⭐⭐⭐⭐</div>
-                            <span>Loved by <span id="userCount">15,000+</span> users worldwide</span>
-                        </div>
-                    </div>
                 </div>
+
                 <div class="features">
                     <div class="feature">
                         <span class="feature-icon">🎙️</span>
@@ -90,7 +84,7 @@
                     <div class="feature">
                         <span class="feature-icon">💡</span>
                         <h3>Get Featured</h3>
-                        <p>Ask engaging questions or share interesting thoughts to increase your chances of being picked</p>
+                        <p>Ask engaging questions or share interesting thoughts to increase your chances</p>
                     </div>
                 </div>
             </div>
@@ -98,18 +92,18 @@
 
         <section class="engagement-stats">
             <div class="stat-card">
-                <div class="stat-icon">🎙️</div>
-                <div class="stat-number" id="responsesCount">5,000+</div>
+                <span class="stat-icon">🎙️</span>
+                <div class="stat-number">5,000+</div>
                 <div class="stat-label">AI Responses</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">⚡</div>
-                <div class="stat-number" id="avgResponseTime">2.5s</div>
+                <span class="stat-icon">⚡</span>
+                <div class="stat-number">2.5s</div>
                 <div class="stat-label">Avg Response Time</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🌍</div>
-                <div class="stat-number" id="countriesCount">50+</div>
+                <span class="stat-icon">🌍</span>
+                <div class="stat-number">50+</div>
                 <div class="stat-label">Countries</div>
             </div>
         </section>
@@ -119,46 +113,18 @@
                 <div class="section-header">
                     <h1>Live Show</h1>
                     <p>Submit your message and it might be featured next - thousands are listening!</p>
-                    <div class="message-preview" id="messagePreview">
-                        <div class="preview-content">
-                            <span class="preview-label">Message Preview</span>
-                            <p class="preview-text"></p>
-                            <div class="preview-stats">
-                                <span class="engagement-score">Engagement Score: <span class="score">0</span></span>
-                                <span class="feature-chance">Feature Chance: <span class="chance">0%</span></span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
+
                 <div class="chat-container">
-                    <div class="active-listeners">
-                        <div class="listener-avatars" id="listenerAvatars"></div>
-                        <span class="typing-indicator"></span>
-                    </div>
-                    <div id="messages" class="messages">
-                        <div class="message-reactions"></div>
-                    </div>
+                    <div id="messages" class="messages"></div>
                     <form id="message-form" class="message-form">
                         <div class="input-container">
                             <input type="text" id="name-input" placeholder="Your name" required>
-                            <div class="message-input-wrapper">
-                                <input type="text" id="message-input" placeholder="Type something interesting to get featured live..." required>
-                                <div class="input-actions">
-                                    <button type="button" id="voiceRecordBtn" class="action-btn" title="Record Voice Message">
-                                        🎤
-                                    </button>
-                                    <button type="button" id="emojiBtn" class="action-btn" title="Add Emoji">
-                                        😊
-                                    </button>
-                                    <div class="message-length">
-                                        <span id="charCount">0</span>/200
-                                    </div>
-                                </div>
-                            </div>
+                            <input type="text" id="message-input" placeholder="Type something interesting to get featured..." required maxlength="200">
                         </div>
                         <button type="submit">Send Message</button>
                     </form>
-                    <div class="voice-recorder-container" id="voiceRecorder">
+                    <div class="voice-recorder-container" style="display: none;">
                         <div class="recorder-controls">
                             <div class="recording-time">00:00</div>
                             <div class="recording-visualizer">
@@ -167,22 +133,33 @@
                             <button class="stop-recording">Stop Recording</button>
                         </div>
                     </div>
-                    <div class="emoji-picker" id="emojiPicker"></div>
-                </div>
-                <div class="engagement-tips">
-                    <h3>💡 Message Tips</h3>
-                    <div class="tips-content">
-                        <p class="current-tip">Ask thought-provoking questions to increase your feature chances!</p>
-                        <div class="tip-progress"></div>
-                    </div>
                 </div>
             </div>
         </section>
 
         <section class="trending-topics">
             <h2>Trending Topics</h2>
-            <div class="topics-container" id="trendingTopics">
-                <!-- Topics will be dynamically added here -->
+            <div class="topics-container">
+                <div class="topic-item">
+                    <span class="topic-name">#AI Ethics</span>
+                    <span class="topic-count">128</span>
+                </div>
+                <div class="topic-item">
+                    <span class="topic-name">#Future Tech</span>
+                    <span class="topic-count">95</span>
+                </div>
+                <div class="topic-item">
+                    <span class="topic-name">#Creativity</span>
+                    <span class="topic-count">82</span>
+                </div>
+                <div class="topic-item">
+                    <span class="topic-name">#Innovation</span>
+                    <span class="topic-count">76</span>
+                </div>
+                <div class="topic-item">
+                    <span class="topic-name">#Science</span>
+                    <span class="topic-count">63</span>
+                </div>
             </div>
         </section>
     </main>
@@ -202,7 +179,7 @@
                     <li>Keep your message clear and engaging</li>
                 </ul>
             </div>
-            <p class="copyright">&copy; 2024 Ask Kaia - An AI Interactive Experience</p>
+            <div class="copyright">&copy; 2024 Ask Kaia - An AI Interactive Experience</div>
         </div>
     </footer>
 

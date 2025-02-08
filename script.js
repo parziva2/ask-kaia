@@ -817,4 +817,145 @@ socket.on('synchronized-content', (data) => {
             playAudioResponse(data.audioUrl, messageDiv, data.text, data.type);
         }
     }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const socket = io();
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const nameInput = document.getElementById('name-input');
+    const messagesDiv = document.getElementById('messages');
+    const listenerCountSpan = document.getElementById('listenerCount');
+    const messageCountSpan = document.getElementById('messageCount');
+
+    // Initialize counters
+    let messageCount = 0;
+    let listenerCount = 0;
+
+    // Update listener count
+    socket.on('listener_count', (count) => {
+        listenerCount = count;
+        listenerCountSpan.textContent = count;
+        animateNumber(listenerCountSpan, count);
+    });
+
+    // Update message count
+    socket.on('message_count', (count) => {
+        messageCount = count;
+        messageCountSpan.textContent = count;
+        animateNumber(messageCountSpan, count);
+    });
+
+    // Handle incoming messages
+    socket.on('message', (data) => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${data.isAI ? 'ai' : 'user'}`;
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        const nameSpan = document.createElement('strong');
+        nameSpan.textContent = data.name;
+        
+        const textSpan = document.createElement('span');
+        textSpan.textContent = data.message;
+        
+        contentDiv.appendChild(nameSpan);
+        contentDiv.appendChild(document.createElement('br'));
+        contentDiv.appendChild(textSpan);
+        
+        if (data.isAI) {
+            const contextDiv = document.createElement('div');
+            contextDiv.className = 'response-context';
+            contextDiv.textContent = 'Responding to a message from the audience';
+            contentDiv.appendChild(contextDiv);
+        }
+        
+        messageDiv.appendChild(contentDiv);
+        messagesDiv.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Increment message count
+        messageCount++;
+        messageCountSpan.textContent = messageCount;
+    });
+
+    // Handle form submission
+    messageForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const name = nameInput.value.trim();
+        const message = messageInput.value.trim();
+        
+        if (name && message) {
+            socket.emit('message', {
+                name: name,
+                message: message,
+                timestamp: new Date().toISOString()
+            });
+            
+            messageInput.value = '';
+            
+            // Save name in localStorage
+            localStorage.setItem('userName', name);
+        }
+    });
+
+    // Load saved username
+    const savedName = localStorage.getItem('userName');
+    if (savedName) {
+        nameInput.value = savedName;
+    }
+
+    // Animate numbers
+    function animateNumber(element, target) {
+        const start = parseInt(element.textContent) || 0;
+        const duration = 1000;
+        const steps = 60;
+        const increment = (target - start) / steps;
+        let current = start;
+        let step = 0;
+
+        const animation = setInterval(() => {
+            step++;
+            current += increment;
+            element.textContent = Math.round(current);
+
+            if (step >= steps) {
+                clearInterval(animation);
+                element.textContent = target;
+            }
+        }, duration / steps);
+    }
+
+    // Character counter
+    messageInput.addEventListener('input', () => {
+        const maxLength = messageInput.getAttribute('maxlength');
+        const currentLength = messageInput.value.length;
+        
+        if (currentLength >= maxLength) {
+            messageInput.value = messageInput.value.slice(0, maxLength);
+        }
+    });
+
+    // Auto-expand input field
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    // Initialize WebSocket connection
+    socket.on('connect', () => {
+        console.log('Connected to server');
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+    });
+
+    socket.on('error', (error) => {
+        console.error('Socket error:', error);
+    });
 }); 
