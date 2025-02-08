@@ -378,15 +378,25 @@ const storage = multer.diskStorage({
         cb(null, 'voice-' + Date.now() + '.wav')
     }
 });
-const upload = multer({ storage: storage });
+
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB max file size
+    }
+});
 
 // Handle audio uploads
 app.post('/upload-audio', upload.single('audio'), async (req, res) => {
     try {
+        console.log('Received audio upload request');
+        
         if (!req.file) {
-            throw new Error('No audio file received');
+            console.error('No audio file received');
+            return res.status(400).json({ success: false, message: 'No audio file received' });
         }
 
+        console.log('Audio file received:', req.file);
         const userId = req.body.userId || 'anonymous';
         const userName = req.body.userName || 'Anonymous';
         
@@ -394,25 +404,32 @@ app.post('/upload-audio', upload.single('audio'), async (req, res) => {
         const response = await generateResponse(`Voice message from ${userName}`, userName);
         
         if (response) {
-            // Generate audio response
-            const audioResponse = await generateAudio(response, 'kaia');
+            console.log('Generated response:', response);
             
-            // Emit the response to all clients
-            io.emit('new-message', {
-                message: response,
-                userId: 'kaia',
-                userName: 'Kaia',
-                isAI: true,
-                messageId: Date.now().toString(),
-                deviceId: 'kaia',
-                timestamp: Date.now()
-            });
-            
-            if (audioResponse) {
-                io.emit('play-audio', {
-                    audioPath: audioResponse,
-                    text: response
+            try {
+                // Generate audio response
+                const audioResponse = await generateAudio(response, 'kaia');
+                console.log('Generated audio response:', audioResponse);
+                
+                // Emit the response to all clients
+                io.emit('new-message', {
+                    message: response,
+                    userId: 'kaia',
+                    userName: 'Kaia',
+                    isAI: true,
+                    messageId: Date.now().toString(),
+                    deviceId: 'kaia',
+                    timestamp: Date.now()
                 });
+                
+                if (audioResponse) {
+                    io.emit('play-audio', {
+                        audioPath: audioResponse,
+                        text: response
+                    });
+                }
+            } catch (error) {
+                console.error('Error generating audio response:', error);
             }
         }
         

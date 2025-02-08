@@ -1,14 +1,200 @@
-// Initialize socket connection with the correct server URL
-const socket = io('https://ask-kaia.onrender.com', {
-    transports: ['polling', 'websocket'],
+// Initialize Socket.IO with proper error handling
+const socket = io({
     reconnection: true,
-    reconnectionAttempts: 10,
+    reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    timeout: 20000,
-    autoConnect: true,
-    withCredentials: true,
-    path: '/socket.io'
+    transports: ['websocket', 'polling']
+});
+
+// DOM Elements
+const liveMessages = document.getElementById('live-messages');
+const liveQuestion = document.getElementById('live-question');
+const queueStatus = document.getElementById('queue-status');
+const listenerCount = document.getElementById('listener-count');
+const slotsAvailable = document.getElementById('slots-available');
+const mainPlayButton = document.getElementById('main-play-button');
+const nowPlaying = document.getElementById('now-playing');
+
+// Track current audio state
+let currentAudio = null;
+let currentAudioElement = null;
+let isRadioPlaying = false;
+let messageCount = 0;
+const MAX_MESSAGES = 10;
+
+// Initialize audio recording variables
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingTimer = null;
+let recordingStartTime = null;
+let audioContext = null;
+let analyser = null;
+let visualizerCanvas = null;
+let canvasCtx = null;
+
+// Initialize audio recording functionality
+function initializeAudioRecording() {
+    const recordButton = document.getElementById('record-button');
+    const stopButton = document.getElementById('stop-recording');
+    const audioControls = document.querySelector('.audio-controls');
+    const timerDisplay = document.querySelector('.recording-timer');
+    visualizerCanvas = document.getElementById('visualizer');
+    
+    if (!recordButton || !stopButton || !audioControls || !timerDisplay || !visualizerCanvas) {
+        console.error('Required audio recording elements not found');
+        return;
+    }
+
+    canvasCtx = visualizerCanvas.getContext('2d');
+
+    recordButton.addEventListener('click', async () => {
+        try {
+            console.log('Requesting microphone access...');
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log('Microphone access granted');
+            
+            audioControls.style.display = 'flex';
+            recordButton.style.display = 'none';
+            
+            // Set up audio context and analyser
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            
+            // Start recording
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            recordingStartTime = Date.now();
+            
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = async () => {
+                console.log('Recording stopped, processing audio...');
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob);
+                formData.append('userId', localStorage.getItem('userId') || 'anonymous');
+                formData.append('userName', document.getElementById('name-input').value || 'Anonymous');
+                
+                try {
+                    console.log('Uploading audio...');
+                    const response = await fetch('/upload-audio', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to upload audio: ' + response.statusText);
+                    }
+                    
+                    const result = await response.json();
+                    console.log('Audio uploaded successfully:', result);
+                    
+                    // Reset UI
+                    audioControls.style.display = 'none';
+                    recordButton.style.display = 'block';
+                    clearInterval(recordingTimer);
+                    timerDisplay.textContent = '00:00';
+                    
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    // Clean up audio context
+                    if (audioContext) {
+                        audioContext.close();
+                        audioContext = null;
+                    }
+                } catch (error) {
+                    console.error('Error uploading audio:', error);
+                    alert('Error uploading audio. Please try again.');
+                }
+            };
+            
+            // Start recording and timer
+            mediaRecorder.start();
+            startRecordingTimer(timerDisplay);
+            drawVisualizer();
+            
+        } catch (error) {
+            console.error('Error accessing microphone:', error);
+            alert('Unable to access microphone. Please check your permissions.');
+            // Reset UI
+            audioControls.style.display = 'none';
+            recordButton.style.display = 'block';
+        }
+    });
+    
+    stopButton.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            console.log('Stopping recording...');
+            mediaRecorder.stop();
+        }
+    });
+}
+
+function startRecordingTimer(display) {
+    recordingTimer = setInterval(() => {
+        const elapsed = Date.now() - recordingStartTime;
+        const seconds = Math.floor(elapsed / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        display.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        
+        // Stop recording after 2 minutes
+        if (seconds >= 120) {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                console.log('Maximum recording time reached, stopping...');
+                mediaRecorder.stop();
+            }
+        }
+    }, 1000);
+}
+
+function drawVisualizer() {
+    if (!analyser || !canvasCtx || !visualizerCanvas) return;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const width = visualizerCanvas.width;
+    const height = visualizerCanvas.height;
+    
+    function draw() {
+        if (!analyser) return;
+        
+        requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+        
+        canvasCtx.fillStyle = 'rgba(20, 20, 20, 0.95)';
+        canvasCtx.fillRect(0, 0, width, height);
+        
+        const barWidth = (width / bufferLength) * 2.5;
+        let barHeight;
+        let x = 0;
+        
+        for (let i = 0; i < bufferLength; i++) {
+            barHeight = (dataArray[i] / 255) * height;
+            
+            const gradient = canvasCtx.createLinearGradient(0, height, 0, height - barHeight);
+            gradient.addColorStop(0, '#ff3366');
+            gradient.addColorStop(1, '#ff1a4d');
+            
+            canvasCtx.fillStyle = gradient;
+            canvasCtx.fillRect(x, height - barHeight, barWidth, barHeight);
+            
+            x += barWidth + 1;
+        }
+    }
+    
+    draw();
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    initializeAudioRecording();
 });
 
 let messageQueue = [];
