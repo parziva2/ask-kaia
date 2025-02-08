@@ -185,23 +185,24 @@ async function generateAudio(text, userId) {
 // Generate Kaia's response
 async function generateResponse(message, userName) {
     try {
-        const prompt = `You are Kaia, a friendly AI assistant. Keep responses very concise (1-2 short sentences). Current user: ${userName}. Their message: "${message}"
+        const prompt = `You are Kaia, a friendly AI assistant. Keep responses concise but engaging (2-3 sentences). Current user: ${userName}. Their message: "${message}"
 
         Guidelines:
-        1. Start by acknowledging the user's message briefly
-        2. Then provide a focused, relevant response
-        3. Keep total response under 2 sentences
-        4. Be friendly but direct
+        1. Always start with "Responding to [userName]'s message: [brief paraphrase of their message]..."
+        2. Then provide your response
+        3. Keep total response under 3 sentences
+        4. Be friendly and engaging
+        5. Make sure other listeners can follow the conversation
 
         Example formats:
-        - "About [topic you mentioned]: [brief, focused response]"
-        - "Regarding your question about [topic]: [concise answer]"
-        - "I understand you're interested in [topic]. [relevant insight/question]"`;
+        - "Responding to Alex's message about AI: Here's my perspective..."
+        - "Responding to Sarah's question about coding: The key thing to understand is..."
+        - "Responding to Mike's thoughts on technology: I find your perspective interesting..."`;
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4-0125-preview",
             messages: [{ role: "system", content: prompt }],
-            max_tokens: 100,
+            max_tokens: 150,
             temperature: 0.7,
             presence_penalty: 0.6
         });
@@ -291,8 +292,8 @@ io.on('connection', (socket) => {
         try {
             console.log('Received message from:', socket.id, 'Message:', data.message);
             
-            // Broadcast user message to all clients
-            io.emit('new-message', {
+            // Only emit the user message from the server to prevent duplicates
+            socket.broadcast.emit('new-message', {
                 message: data.message,
                 userId: data.userId,
                 userName: data.userName,

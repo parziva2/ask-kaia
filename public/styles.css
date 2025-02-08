@@ -191,18 +191,21 @@ main {
     padding: 0;
     margin-top: 2rem;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 
 .messages {
-    min-height: 300px;
-    max-height: 500px;
+    min-height: 400px;
+    max-height: 600px;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 1.5rem;
+    background: rgba(13, 13, 13, 0.95);
 }
 
 .message {
     padding: 1rem 1.25rem;
-    margin: 0.25rem 0;
+    margin: 0.5rem 0;
     border-radius: 4px;
     max-width: 100%;
     word-wrap: break-word;
@@ -211,13 +214,16 @@ main {
     display: flex;
     flex-direction: column;
     background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .message-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .message strong {
@@ -231,15 +237,20 @@ main {
 
 .message-content {
     color: rgba(255, 255, 255, 0.9);
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 .user-message {
-    border-left: 3px solid #ff3366;
+    border-left: 3px solid #3399ff;
+    margin-left: 2rem;
+    margin-right: 1rem;
 }
 
 .ai-message {
-    border-left: 3px solid #3399ff;
+    border-left: 3px solid #ff3366;
+    margin-right: 2rem;
+    margin-left: 1rem;
+    background: rgba(35, 35, 35, 0.95);
 }
 
 .system-message {
@@ -259,29 +270,47 @@ main {
 .message-form {
     display: flex;
     gap: 0.75rem;
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.4);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 1.25rem;
+    background: rgba(20, 20, 20, 0.98);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    position: sticky;
+    bottom: 0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
 }
 
 #name-input {
     width: 150px;
     padding: 0.75rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
-    background: rgba(30, 30, 30, 0.95);
+    background: rgba(40, 40, 40, 0.95);
     color: #fff;
     font-size: 0.95rem;
+    transition: all 0.2s ease;
 }
 
 #message-input {
     flex: 1;
     padding: 0.75rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
-    background: rgba(30, 30, 30, 0.95);
+    background: rgba(40, 40, 40, 0.95);
     color: #fff;
     font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+#name-input:focus,
+#message-input:focus {
+    outline: none;
+    border-color: #ff3366;
+    background: rgba(45, 45, 45, 0.95);
+    box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.1);
+}
+
+#name-input::placeholder,
+#message-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
 }
 
 .message-form button {
@@ -293,24 +322,28 @@ main {
     cursor: pointer;
     font-weight: 500;
     font-size: 0.95rem;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
     white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(255, 51, 102, 0.2);
 }
 
 .message-form button:hover {
     background: #ff1a4d;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 51, 102, 0.3);
 }
 
-#name-input::placeholder,
-#message-input::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+.message-form button:active {
+    transform: translateY(1px);
 }
 
-#name-input:focus,
-#message-input:focus {
-    outline: none;
-    border-color: #ff3366;
-    box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.1);
+.response-context {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-style: italic;
 }
 
 /* Scrollbar styling */
