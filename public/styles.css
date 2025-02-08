@@ -186,13 +186,13 @@ main {
 }
 
 .chat-container {
-    background: rgba(17, 17, 17, 0.95);
+    background: rgba(12, 12, 12, 0.95);
     border-radius: 12px;
     padding: 0;
     margin-top: 2rem;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .messages {
@@ -200,7 +200,7 @@ main {
     max-height: 600px;
     overflow-y: auto;
     padding: 1.5rem;
-    background: rgba(13, 13, 13, 0.95);
+    background: rgba(10, 10, 10, 0.95);
 }
 
 .message {
@@ -213,7 +213,7 @@ main {
     font-size: 0.95rem;
     display: flex;
     flex-direction: column;
-    background: rgba(30, 30, 30, 0.95);
+    background: rgba(20, 20, 20, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -228,6 +228,7 @@ main {
 
 .message strong {
     font-weight: 500;
+    color: #fff;
 }
 
 .message .timestamp {
@@ -244,13 +245,14 @@ main {
     border-left: 3px solid #3399ff;
     margin-left: 2rem;
     margin-right: 1rem;
+    background: rgba(25, 25, 35, 0.95);
 }
 
 .ai-message {
     border-left: 3px solid #ff3366;
     margin-right: 2rem;
     margin-left: 1rem;
-    background: rgba(35, 35, 35, 0.95);
+    background: rgba(35, 25, 35, 0.95);
 }
 
 .system-message {
@@ -271,11 +273,11 @@ main {
     display: flex;
     gap: 0.75rem;
     padding: 1.25rem;
-    background: rgba(20, 20, 20, 0.98);
+    background: rgba(15, 15, 15, 0.98);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     position: sticky;
     bottom: 0;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
 }
 
 #name-input {
@@ -283,7 +285,7 @@ main {
     padding: 0.75rem 1rem;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
-    background: rgba(40, 40, 40, 0.95);
+    background: rgba(25, 25, 25, 0.95);
     color: #fff;
     font-size: 0.95rem;
     transition: all 0.2s ease;
@@ -294,7 +296,7 @@ main {
     padding: 0.75rem 1rem;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
-    background: rgba(40, 40, 40, 0.95);
+    background: rgba(25, 25, 25, 0.95);
     color: #fff;
     font-size: 0.95rem;
     transition: all 0.2s ease;
@@ -304,8 +306,8 @@ main {
 #message-input:focus {
     outline: none;
     border-color: #ff3366;
-    background: rgba(45, 45, 45, 0.95);
-    box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.1);
+    background: rgba(30, 30, 30, 0.95);
+    box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.2);
 }
 
 #name-input::placeholder,
@@ -338,7 +340,7 @@ main {
 }
 
 .response-context {
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 0.9rem;
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
@@ -356,12 +358,12 @@ main {
 }
 
 .messages::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 2px;
 }
 
 .messages::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
 }
 
 /* Footer */
