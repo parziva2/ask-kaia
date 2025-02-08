@@ -121,18 +121,23 @@
                         <div class="input-container">
                             <input type="text" id="name-input" placeholder="Your name" required>
                             <input type="text" id="message-input" placeholder="Type something interesting to get featured..." required maxlength="200">
+                            <button type="button" id="record-button" class="record-button">
+                                <span class="record-icon">🎤</span>
+                                <span class="record-text">Record</span>
+                            </button>
+                            <button type="submit">Send Message</button>
                         </div>
-                        <button type="submit">Send Message</button>
-                    </form>
-                    <div class="voice-recorder-container" style="display: none;">
-                        <div class="recorder-controls">
-                            <div class="recording-time">00:00</div>
-                            <div class="recording-visualizer">
-                                <canvas id="visualizer"></canvas>
+                        <div class="audio-controls" style="display: none;">
+                            <div class="audio-visualizer">
+                                <canvas id="visualizer" class="visualizer-canvas"></canvas>
+                                <div class="recording-timer">00:00</div>
                             </div>
-                            <button class="stop-recording">Stop Recording</button>
+                            <button type="button" class="record-button recording" id="stop-recording">
+                                <span class="record-icon">⏹️</span>
+                                <span class="record-text">Stop</span>
+                            </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </section>
@@ -223,11 +228,11 @@
         let mediaRecorder;
         let audioChunks = [];
         
-        document.getElementById('voiceRecordBtn').addEventListener('click', async () => {
+        document.getElementById('record-button').addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const voiceRecorder = document.getElementById('voiceRecorder');
-                voiceRecorder.style.display = 'block';
+                const audioControls = document.querySelector('.audio-controls');
+                audioControls.style.display = 'block';
                 
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
@@ -245,7 +250,7 @@
                         userId: localStorage.getItem('userId'),
                         userName: document.getElementById('name-input').value
                     });
-                    voiceRecorder.style.display = 'none';
+                    audioControls.style.display = 'none';
                 };
                 
                 mediaRecorder.start();
@@ -254,6 +259,10 @@
                 console.error('Error accessing microphone:', err);
                 alert('Unable to access microphone. Please check your permissions.');
             }
+        });
+
+        document.getElementById('stop-recording').addEventListener('click', () => {
+            mediaRecorder.stop();
         });
 
         // Message preview system
