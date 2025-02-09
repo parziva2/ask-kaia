@@ -193,6 +193,15 @@ socket.on('competition-start', (data) => {
 // Handle competition winner with debug logging
 socket.on('competition-winner', (data) => {
     console.log('Received competition winner:', data);  // Debug log
+    
+    // Don't process if this winner was already announced
+    const existingWinners = messagesContainer.querySelectorAll('.winner-message');
+    for (const winner of existingWinners) {
+        if (winner.dataset.messageId === String(data.timestamp)) {
+            return; // Skip if winner already announced
+        }
+    }
+    
     competitionEndTime = null;
     if (competitionInterval) {
         clearInterval(competitionInterval);
@@ -206,20 +215,20 @@ socket.on('competition-winner', (data) => {
     // Add winner announcement
     const winnerMessage = document.createElement('div');
     winnerMessage.className = 'message winner-message';
-    winnerMessage.dataset.messageId = data.timestamp; // Add unique identifier
+    winnerMessage.dataset.messageId = String(data.timestamp); // Add unique identifier
     winnerMessage.innerHTML = `
         <div class="winner-banner">
             🏆 Winning Message!
             <div class="score">Score: ${Math.round(data.score * 10) / 10}</div>
         </div>
         <div class="message-content">
-            <strong>${data.userName || 'Anonymous'}</strong>: ${data.message || ''}
+            <strong>${data.userName || 'Anonymous'}</strong>: ${data.message}
         </div>
         <div class="kaia-response">
             <div class="response-header">
                 <span class="ai-indicator">🎙️ Kaia's Response:</span>
             </div>
-            ${data.response || ''}
+            ${data.response}
         </div>
     `;
     
@@ -249,7 +258,9 @@ socket.on('competition-state', (data) => {
 
 // Handle message errors
 socket.on('message-error', (data) => {
-    addSystemMessage(data.message, 'error');
+    if (!data.message.includes('Starting new competition')) {
+        addSystemMessage(data.message, 'error');
+    }
 });
 
 // Initialize message handling
@@ -270,8 +281,6 @@ function initializeMessageHandling() {
         const name = nameInput.value.trim() || 'Anonymous';
         
         if (message) {
-            console.log('Sending message:', message); // Debug log
-            
             const timestamp = Date.now();
             // Create message data object
             const messageData = {
@@ -305,7 +314,10 @@ function initializeMessageHandling() {
 // Handle incoming messages with debug logging
 socket.on('new-message', (data) => {
     console.log('Received new message:', data);  // Debug log
-    addMessage(data);
+    // Only add the message if it's not from the current user
+    if (data.userId !== localStorage.getItem('deviceId')) {
+        addMessage(data);
+    }
 });
 
 // Add message to UI
@@ -315,23 +327,27 @@ function addMessage(data, isUser = false) {
     // Don't display duplicate messages
     const existingMessages = messagesContainer.querySelectorAll('.message');
     for (const msg of existingMessages) {
-        if (msg.dataset.messageId === data.timestamp) {
+        if (msg.dataset.messageId === String(data.timestamp)) {
             return; // Skip if message already exists
         }
     }
     
     const messageElement = document.createElement('div');
     messageElement.className = `message ${isUser ? 'user-message' : ''} ${data.isCompeting ? 'competing-message' : ''}`;
-    messageElement.dataset.messageId = data.timestamp; // Add unique identifier
+    messageElement.dataset.messageId = String(data.timestamp); // Add unique identifier
+    
+    // Handle message content properly
+    const messageText = typeof data === 'string' ? data : data.message;
+    const userName = typeof data === 'string' ? (isUser ? nameInput.value || 'Anonymous' : 'Kaia') : (data.userName || 'Anonymous');
     
     // Format the message content properly
     let content = `
         ${data.isCompeting ? '<div class="competing-badge">🎯 Competing</div>' : ''}
         <div class="message-content">
-            <strong>${data.userName || 'Anonymous'}</strong>: ${data.message || ''}
+            <strong>${userName}</strong>: ${messageText}
         </div>
         <div class="message-meta">
-            <span class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</span>
+            <span class="timestamp">${new Date(data.timestamp || Date.now()).toLocaleTimeString()}</span>
             ${data.score ? `<span class="score">Score: ${Math.round(data.score * 10) / 10}</span>` : ''}
         </div>
     `;
@@ -362,36 +378,6 @@ socket.on('disconnect', () => {
 socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
 });
-
-// Message Handling
-function addMessage(message, isUser = false) {
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('message', isUser ? 'user-message' : 'ai-message');
-    
-    const header = document.createElement('div');
-    header.classList.add('message-header');
-    
-    const name = document.createElement('span');
-    name.textContent = isUser ? nameInput.value || 'User' : 'Kaia';
-    header.appendChild(name);
-    
-    const time = document.createElement('span');
-    time.textContent = new Date().toLocaleTimeString();
-    header.appendChild(time);
-    
-    const content = document.createElement('div');
-    content.classList.add('message-content');
-    content.textContent = message;
-    
-    messageElement.appendChild(header);
-    messageElement.appendChild(content);
-    
-    messagesContainer.appendChild(messageElement);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
-    // Update visualization data
-    updateVisualization(message.length);
-}
 
 // Only initialize visualization if canvas exists
 function updateVisualization(value) {
