@@ -668,29 +668,7 @@ async function initializeAudioContext() {
         source.start(0);
         source.stop(0.001); // Extremely short duration
 
-        // Try to play a silent audio file (important for iOS)
-        if (responseAudio) {
-            responseAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-            try {
-                await responseAudio.play();
-                responseAudio.pause();
-            } catch (e) {
-                console.log('Silent audio play failed (expected):', e);
-            }
-        }
-        
         audioInitialized = true;
-        audioEnabled = true;
-        localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
-        
-        // Update button state
-        const audioButton = document.getElementById('enable-audio-button');
-        if (audioButton) {
-            audioButton.innerHTML = '🔊';
-            audioButton.classList.remove('disabled');
-            audioButton.setAttribute('aria-label', 'Mute Audio');
-        }
-        
         return true;
     } catch (error) {
         console.error('Error initializing audio context:', error);
@@ -854,78 +832,42 @@ function addAudioEnableButton() {
         
         try {
             isHandlingClick = true;
-            button.disabled = true;
             
-            // Add visual feedback
-            button.classList.add('processing');
+            // Update UI immediately
+            audioEnabled = !audioEnabled;
+            button.innerHTML = audioEnabled ? '🔊' : '🔇';
+            button.classList.toggle('disabled', !audioEnabled);
+            button.setAttribute('aria-label', audioEnabled ? 'Mute Audio' : 'Enable Audio');
+            localStorage.setItem(AUDIO_ENABLED_KEY, audioEnabled.toString());
             
-            if (!audioEnabled) {
-                console.log('Attempting to enable audio...');
-                
-                // Close existing context if it exists
-                if (audioContext) {
-                    try {
-                        await audioContext.close();
-                    } catch (error) {
-                        console.error('Error closing audio context:', error);
+            // Add subtle feedback animation
+            button.classList.add('clicked');
+            setTimeout(() => button.classList.remove('clicked'), 200);
+            
+            if (audioEnabled) {
+                // Handle audio initialization in the background
+                initializeAudioContext().then(success => {
+                    if (!success && audioEnabled) {
+                        // If initialization failed but button shows enabled, show error
+                        button.classList.add('error');
+                        setTimeout(() => {
+                            button.classList.remove('error');
+                            // Revert to disabled state
+                            audioEnabled = false;
+                            button.innerHTML = '🔇';
+                            button.classList.add('disabled');
+                            localStorage.setItem(AUDIO_ENABLED_KEY, 'false');
+                        }, 1000);
                     }
-                    audioContext = null;
-                }
-                audioInitialized = false;
-                
-                // Try to initialize audio multiple times if needed
-                let success = false;
-                for (let i = 0; i < 3 && !success; i++) {
-                    if (i > 0) {
-                        console.log(`Retry attempt ${i + 1}...`);
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                    success = await initializeAudioContext();
-                }
-                
-                if (success) {
-                    console.log('Audio initialization successful');
-                    audioEnabled = true;
-                    localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
-                    button.innerHTML = '🔊';
-                    button.classList.remove('disabled');
-                    button.setAttribute('aria-label', 'Mute Audio');
-                    
-                    // Try to play any pending messages
-                    if (pendingAudioMessages.length > 0) {
-                        const nextMessage = pendingAudioMessages.shift();
-                        await playAudioResponse(nextMessage.audioUrl, nextMessage.text);
-                    }
-                } else {
-                    console.error('Failed to initialize audio after multiple attempts');
-                    button.classList.add('error');
-                    setTimeout(() => button.classList.remove('error'), 2000);
-                    
-                    // Reset to disabled state
-                    audioEnabled = false;
-                    localStorage.setItem(AUDIO_ENABLED_KEY, 'false');
-                    button.innerHTML = '🔇';
-                    button.classList.add('disabled');
-                }
+                });
             } else {
-                console.log('Disabling audio...');
-                audioEnabled = false;
-                localStorage.setItem(AUDIO_ENABLED_KEY, 'false');
-                button.innerHTML = '🔇';
-                button.classList.add('disabled');
-                button.setAttribute('aria-label', 'Enable Audio');
-                
-                // Clean up current audio
+                // Clean up audio resources in the background
                 if (responseAudio) {
                     responseAudio.pause();
                     responseAudio.currentTime = 0;
                 }
                 if (audioContext) {
-                    try {
-                        await audioContext.close();
-                    } catch (error) {
-                        console.error('Error closing audio context:', error);
-                    }
+                    audioContext.close().catch(console.error);
                     audioContext = null;
                 }
                 audioInitialized = false;
@@ -933,22 +875,14 @@ function addAudioEnableButton() {
                 pendingAudioMessages = [];
             }
         } catch (error) {
-            console.error('Error toggling audio:', error);
+            console.error('Error handling audio toggle:', error);
             button.classList.add('error');
-            setTimeout(() => button.classList.remove('error'), 2000);
-            
-            // Reset to previous state on error
-            button.innerHTML = audioEnabled ? '🔊' : '🔇';
-            button.classList.toggle('disabled', !audioEnabled);
+            setTimeout(() => button.classList.remove('error'), 1000);
         } finally {
-            button.classList.remove('processing');
-            button.disabled = false;
-            
-            // Reset handling state after a delay
-            clearTimeout(clickTimeout);
-            clickTimeout = setTimeout(() => {
+            // Reset click handling after a short delay
+            setTimeout(() => {
                 isHandlingClick = false;
-            }, 500); // Prevent rapid clicks for 500ms
+            }, 200);
         }
     };
     
@@ -982,7 +916,7 @@ function addAudioEnableButton() {
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
+            transition: all 0.15s ease;
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
@@ -993,9 +927,8 @@ function addAudioEnableButton() {
             background: rgba(0, 0, 0, 0.5);
         }
         
-        .floating-audio-button.processing {
-            opacity: 0.7;
-            animation: pulse 1s infinite;
+        .floating-audio-button.clicked {
+            transform: scale(0.95);
         }
         
         .floating-audio-button.error {
@@ -1003,20 +936,10 @@ function addAudioEnableButton() {
             border-color: #ff3366;
         }
         
-        .floating-audio-button:disabled {
-            pointer-events: none;
-        }
-        
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             25% { transform: translateX(-5px); }
             75% { transform: translateX(5px); }
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(0.95); }
-            100% { transform: scale(1); }
         }
         
         @media (hover: hover) {
