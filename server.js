@@ -234,12 +234,96 @@ async function generateResponse(message, userName, isCompetitionWinner = false) 
     }
 }
 
+// Socket connection handling with improved reliability
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+    
+    // Send current state to new client
+    socket.emit('connection-state', {
+        activeListeners: state.activeListeners.size,
+        serverTime: Date.now()
+    });
+    
+    state.activeListeners.add(socket.id);
+    io.emit('listener-count', state.activeListeners.size);
+
+    // Send current competition state
+    socket.emit('competition-state', {
+        isActive: state.currentCompetition.isActive,
+        endTime: state.currentCompetition.endTime,
+        messageCount: state.currentCompetition.messages.length
+    });
+
+    socket.on('send-message', async (data) => {
+        try {
+            console.log('Received message:', data);
+            
+            if (!state.currentCompetition.isActive) {
+                // Start a new competition if none is active
+                startCompetitionRound();
+                socket.emit('message-error', { message: 'Starting new competition round...' });
+                
+                // Wait for the competition to start before processing the message
+                setTimeout(() => {
+                    processNewMessage(data, socket);
+                }, 1000);
+                return;
+            }
+            
+            processNewMessage(data, socket);
+            
+        } catch (error) {
+            console.error('Error handling message:', error);
+            socket.emit('error', { message: 'Error processing your message' });
+        }
+    });
+
+    socket.on('audio-complete', () => {
+        console.log('Received audio completion signal from:', socket.id);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('Client disconnected:', socket.id, 'Reason:', reason);
+        state.activeListeners.delete(socket.id);
+        io.emit('listener-count', state.activeListeners.size);
+    });
+});
+
+// Add new function to process messages
+async function processNewMessage(data, socket) {
+    if (state.currentCompetition.messages.length >= MAX_MESSAGES_PER_COMPETITION) {
+        socket.emit('message-error', { message: 'This round is full. Please wait for the next round.' });
+        return;
+    }
+    
+    const score = scoreMessage(data.message, data.userId);
+    const messageData = {
+        ...data,
+        score,
+        timestamp: Date.now(),
+        isCompeting: true
+    };
+    
+    // Add to competition messages
+    state.currentCompetition.messages.push(messageData);
+    
+    // Broadcast the message to all clients
+    console.log('Broadcasting message to all clients:', messageData);
+    io.emit('new-message', messageData);
+    
+    // Start competition if minimum messages reached
+    if (state.currentCompetition.messages.length >= MIN_MESSAGES_TO_START && !state.currentCompetition.isActive) {
+        startCompetitionRound();
+    }
+}
+
 // Start a new competition round
 function startCompetitionRound() {
     if (state.currentCompetition.isActive) return;
     
+    console.log('Starting new competition round');
     state.currentCompetition = {
-        messages: [],
+        messages: state.currentCompetition.messages || [], // Keep existing messages
         startTime: Date.now(),
         endTime: Date.now() + COMPETITION_DURATION,
         isActive: true,
@@ -319,85 +403,6 @@ async function endCompetitionRound() {
     // Start new round after a short delay
     setTimeout(startCompetitionRound, 5000);
 }
-
-// Socket connection handling with improved reliability
-io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
-    
-    // Send current state to new client
-    socket.emit('connection-state', {
-        activeListeners: state.activeListeners.size,
-        serverTime: Date.now()
-    });
-    
-    state.activeListeners.add(socket.id);
-    io.emit('listener-count', state.activeListeners.size);
-
-    // Send current competition state
-    socket.emit('competition-state', {
-        isActive: state.currentCompetition.isActive,
-        endTime: state.currentCompetition.endTime,
-        messageCount: state.currentCompetition.messages.length
-    });
-
-    socket.on('send-message', async (data) => {
-        try {
-            console.log('Received message:', data);
-            
-            if (!state.currentCompetition.isActive) {
-                // Start a new competition if none is active
-                startCompetitionRound();
-                socket.emit('message-error', { message: 'Starting new competition round...' });
-                return;
-            }
-            
-            if (state.currentCompetition.messages.length >= MAX_MESSAGES_PER_COMPETITION) {
-                socket.emit('message-error', { message: 'This round is full. Please wait for the next round.' });
-                return;
-            }
-            
-            const score = scoreMessage(data.message, data.userId);
-            const messageData = {
-                ...data,
-                score,
-                timestamp: Date.now()
-            };
-            
-            state.currentCompetition.messages.push(messageData);
-            
-            // Broadcast the message to all clients
-            io.emit('new-message', {
-                ...messageData,
-                isCompeting: true
-            });
-            
-            // Start competition if minimum messages reached
-            if (state.currentCompetition.messages.length >= MIN_MESSAGES_TO_START) {
-                // Ensure competition is active
-                if (!state.currentCompetition.isActive) {
-                    startCompetitionRound();
-                }
-            }
-            
-        } catch (error) {
-            console.error('Error handling message:', error);
-            socket.emit('error', { message: 'Error processing your message' });
-        }
-    });
-
-    socket.on('audio-complete', () => {
-        console.log('Received audio completion signal from:', socket.id);
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('Client disconnected:', socket.id, 'Reason:', reason);
-        state.activeListeners.delete(socket.id);
-        io.emit('listener-count', state.activeListeners.size);
-    });
-});
-
-// Start initial competition round
-startCompetitionRound();
 
 // Start processing loop with shorter interval
 setInterval(() => {
