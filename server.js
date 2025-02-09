@@ -83,8 +83,21 @@ const state = {
     isProcessing: false,
     waitingForAudioComplete: false,
     activeListeners: new Set(),
-    lastMessageTime: Date.now()
+    lastMessageTime: Date.now(),
+    conversationHistory: [],
+    currentCompetition: {
+        messages: [],
+        startTime: null,
+        endTime: null,
+        isActive: false,
+        winningMessage: null
+    }
 };
+
+// Competition settings
+const COMPETITION_DURATION = 30000; // 30 seconds
+const MIN_MESSAGES_TO_START = 3;
+const MAX_MESSAGES_PER_COMPETITION = 10;
 
 // Score messages for interest and relevance
 function scoreMessage(message, userId) {
@@ -184,21 +197,27 @@ async function generateAudio(text, userId) {
 }
 
 // Generate Kaia's response
-async function generateResponse(message, userName) {
+async function generateResponse(message, userName, isCompetitionWinner = false) {
     try {
-        const prompt = `You are Kaia, a friendly AI assistant. Keep responses concise but engaging (2-3 sentences). Current user: ${userName}. Their message: "${message}"
+        const prompt = isCompetitionWinner ?
+            `You are Kaia, hosting a live AI talk show. This message won the competition for being most interesting! Current user: ${userName}. Their winning message: "${message}"
 
-        Guidelines:
-        1. Always start with "Responding to [userName]'s message: [brief paraphrase of their message]..."
-        2. Then provide your response
-        3. Keep total response under 3 sentences
-        4. Be friendly and engaging
-        5. Make sure other listeners can follow the conversation
+            Guidelines:
+            1. Start with an enthusiastic announcement that this message won
+            2. Briefly explain why it's an interesting message
+            3. Provide your thoughtful response
+            4. Keep total response under 4 sentences
+            5. Be engaging and dynamic, like a live show host
 
-        Example formats:
-        - "Responding to Alex's message about AI: Here's my perspective..."
-        - "Responding to Sarah's question about coding: The key thing to understand is..."
-        - "Responding to Mike's thoughts on technology: I find your perspective interesting..."`;
+            Example format:
+            "Congratulations! We have a winning message from [userName]! This caught my attention because... Here's my response..."` :
+            `You are Kaia, a friendly AI assistant. Keep responses concise but engaging (2-3 sentences). Current user: ${userName}. Their message: "${message}"
+
+            Guidelines:
+            1. Always start with "Responding to [userName]'s message..."
+            2. Then provide your response
+            3. Keep total response under 3 sentences
+            4. Be friendly and engaging`;
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4-0125-preview",
@@ -215,65 +234,72 @@ async function generateResponse(message, userName) {
     }
 }
 
-// Process messages from the queue
-async function processMessageQueue() {
-    if (state.isProcessing || state.waitingForAudioComplete || state.messageQueue.length === 0) {
+// Start a new competition round
+function startCompetitionRound() {
+    if (state.currentCompetition.isActive) return;
+    
+    state.currentCompetition = {
+        messages: [],
+        startTime: Date.now(),
+        endTime: Date.now() + COMPETITION_DURATION,
+        isActive: true,
+        winningMessage: null
+    };
+    
+    io.emit('competition-start', {
+        duration: COMPETITION_DURATION,
+        endTime: state.currentCompetition.endTime
+    });
+    
+    // Schedule competition end
+    setTimeout(endCompetitionRound, COMPETITION_DURATION);
+}
+
+// End current competition round
+async function endCompetitionRound() {
+    if (!state.currentCompetition.isActive) return;
+    
+    const messages = state.currentCompetition.messages;
+    if (messages.length === 0) {
+        state.currentCompetition.isActive = false;
+        startCompetitionRound(); // Start new round if no messages
         return;
     }
-
-    state.isProcessing = true;
+    
+    // Select winning message
+    const winningMessage = messages.reduce((prev, current) => 
+        (prev.score > current.score) ? prev : current
+    );
+    
+    state.currentCompetition.winningMessage = winningMessage;
+    state.currentCompetition.isActive = false;
+    
+    // Generate and send response
     try {
-        const messageData = state.messageQueue.shift();
-        console.log('Processing message:', messageData.message);
-
-        const response = await generateResponse(messageData.message, messageData.userName);
+        const response = await generateResponse(winningMessage.message, winningMessage.userName, true);
         
         if (response) {
-            console.log('Generated response:', response);
-
-            try {
-                // Send the text response immediately
-                io.emit('new-message', {
-                    message: response,
-                    userId: 'kaia',
-                    userName: 'Kaia',
-                    isAI: true,
-                    messageId: Date.now().toString(),
-                    deviceId: 'kaia'
+            io.emit('competition-winner', {
+                userName: winningMessage.userName,
+                message: winningMessage.message,
+                response: response,
+                score: winningMessage.score
+            });
+            
+            const audioResponse = await generateAudio(response, 'kaia');
+            if (audioResponse) {
+                io.emit('play-audio', {
+                    audioPath: audioResponse,
+                    text: response
                 });
-
-                // Generate and send audio
-                const audioResponse = await generateAudio(response, 'kaia');
-                console.log('Generated audio response:', audioResponse);
-                
-                if (audioResponse) {
-                    io.emit('play-audio', {
-                        audioPath: audioResponse,
-                        text: response
-                    });
-                    state.waitingForAudioComplete = true;
-                } else {
-                    console.error('No audio response generated');
-                    state.waitingForAudioComplete = false;
-                }
-            } catch (error) {
-                console.error('Error during audio generation or playback:', error);
-                state.waitingForAudioComplete = false;
-                io.emit('error', { message: 'Error processing audio response' });
             }
-        } else {
-            console.error('Failed to generate response');
-            state.waitingForAudioComplete = false;
-            io.emit('error', { message: 'Failed to generate response' });
         }
     } catch (error) {
-        console.error('Error processing message queue:', error);
-        state.waitingForAudioComplete = false;
-        io.emit('error', { message: 'Error processing your message' });
-    } finally {
-        state.isProcessing = false;
-        state.lastMessageTime = Date.now();
+        console.error('Error handling winning message:', error);
     }
+    
+    // Start new round after a short delay
+    setTimeout(startCompetitionRound, 5000);
 }
 
 // Socket connection handling with improved reliability
@@ -289,57 +315,46 @@ io.on('connection', (socket) => {
     state.activeListeners.add(socket.id);
     io.emit('listener-count', state.activeListeners.size);
 
+    // Send current competition state
+    socket.emit('competition-state', {
+        isActive: state.currentCompetition.isActive,
+        endTime: state.currentCompetition.endTime,
+        messageCount: state.currentCompetition.messages.length
+    });
+
     socket.on('send-message', async (data) => {
         try {
-            console.log('Received message from:', socket.id, 'Message:', data.message);
+            if (!state.currentCompetition.isActive) {
+                socket.emit('message-error', { message: 'Please wait for the next competition round to start.' });
+                return;
+            }
             
-            // Only emit the user message from the server to prevent duplicates
-            socket.broadcast.emit('new-message', {
-                message: data.message,
-                userId: data.userId,
-                userName: data.userName,
-                messageId: data.messageId,
-                deviceId: data.deviceId,
+            if (state.currentCompetition.messages.length >= MAX_MESSAGES_PER_COMPETITION) {
+                socket.emit('message-error', { message: 'This round is full. Please wait for the next round.' });
+                return;
+            }
+            
+            const score = scoreMessage(data.message, data.userId);
+            const messageData = {
+                ...data,
+                score,
                 timestamp: Date.now()
+            };
+            
+            state.currentCompetition.messages.push(messageData);
+            
+            // Broadcast the message to all clients
+            io.emit('new-message', {
+                ...messageData,
+                isCompeting: true
             });
             
-            // Generate Kaia's response
-            const response = await generateResponse(data.message, data.userName);
-            console.log('Generated response:', response);
-            
-            if (response) {
-                // Send text response
-                io.emit('new-message', {
-                    message: response,
-                    userId: 'kaia',
-                    userName: 'Kaia',
-                    isAI: true,
-                    messageId: Date.now().toString(),
-                    deviceId: 'kaia',
-                    timestamp: Date.now()
-                });
-
-                try {
-                    // Generate and send audio
-                    const audioResponse = await generateAudio(response, 'kaia');
-                    console.log('Generated audio response:', audioResponse);
-                    
-                    if (audioResponse) {
-                        io.emit('play-audio', {
-                            audioPath: audioResponse,
-                            text: response
-                        });
-                    } else {
-                        console.error('No audio response generated');
-                    }
-                } catch (error) {
-                    console.error('Error during audio generation:', error);
-                    socket.emit('error', { message: 'Error generating audio response' });
-                }
-            } else {
-                console.error('Failed to generate response');
-                socket.emit('error', { message: 'Failed to generate response' });
+            // Start competition if minimum messages reached
+            if (!state.currentCompetition.isActive && 
+                state.currentCompetition.messages.length >= MIN_MESSAGES_TO_START) {
+                startCompetitionRound();
             }
+            
         } catch (error) {
             console.error('Error handling message:', error);
             socket.emit('error', { message: 'Error processing your message' });
@@ -356,6 +371,9 @@ io.on('connection', (socket) => {
         io.emit('listener-count', state.activeListeners.size);
     });
 });
+
+// Start initial competition round
+startCompetitionRound();
 
 // Start processing loop with shorter interval
 setInterval(() => {

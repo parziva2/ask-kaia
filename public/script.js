@@ -20,6 +20,8 @@ const messageInput = document.getElementById('message-input');
 const sendButton = document.querySelector('.send-button');
 const visualizationCanvas = document.getElementById('visualization-canvas');
 const sphereCanvas = document.getElementById('sphere-animation');
+const competitionStatus = document.getElementById('competition-status');
+const competitionTimer = document.getElementById('competition-timer');
 
 // Track current audio state
 let currentAudio = null;
@@ -28,9 +30,14 @@ let isRadioPlaying = false;
 let messageCount = 0;
 const MAX_MESSAGES = 10;
 
+// Competition state
+let competitionEndTime = null;
+let competitionInterval = null;
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     initializeMessageHandling();
+    initializeCompetitionUI();
 });
 
 let messageQueue = [];
@@ -118,325 +125,211 @@ function ensureMessagesContainer() {
     return messagesDiv;
 }
 
-// Add a system message
-function addSystemMessage(message, type = '') {
-    const messagesDiv = ensureMessagesContainer();
-    const systemMessage = document.createElement('div');
-    systemMessage.className = `system-message ${type}`;
-    systemMessage.textContent = message;
-    messagesDiv.appendChild(systemMessage);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+// Initialize competition UI
+function initializeCompetitionUI() {
+    const competitionSection = document.createElement('div');
+    competitionSection.className = 'competition-section';
+    competitionSection.innerHTML = `
+        <div class="competition-header">
+            <h2>Message Competition</h2>
+            <div id="competition-status">Waiting for messages...</div>
+            <div id="competition-timer"></div>
+        </div>
+        <div class="competition-rules">
+            <p>Submit your message to compete! The most interesting message will be chosen and responded to by Kaia.</p>
+            <ul>
+                <li>Messages are scored based on creativity and engagement</li>
+                <li>Competition rounds last 30 seconds</li>
+                <li>Winners get special responses from Kaia</li>
+            </ul>
+        </div>
+    `;
+    
+    document.querySelector('.interaction-zone').prepend(competitionSection);
 }
+
+// Update competition timer
+function updateCompetitionTimer() {
+    if (!competitionEndTime) return;
+    
+    const now = Date.now();
+    const timeLeft = Math.max(0, competitionEndTime - now);
+    
+    if (timeLeft === 0) {
+        if (competitionTimer) {
+            competitionTimer.textContent = 'Selecting winner...';
+        }
+        return;
+    }
+    
+    const seconds = Math.ceil(timeLeft / 1000);
+    if (competitionTimer) {
+        competitionTimer.textContent = `Time remaining: ${seconds}s`;
+    }
+}
+
+// Handle competition start
+socket.on('competition-start', (data) => {
+    competitionEndTime = data.endTime;
+    
+    if (competitionStatus) {
+        competitionStatus.textContent = 'Competition Active! Submit your message now!';
+        competitionStatus.className = 'status-active';
+    }
+    
+    if (competitionInterval) {
+        clearInterval(competitionInterval);
+    }
+    
+    competitionInterval = setInterval(updateCompetitionTimer, 100);
+    
+    // Add competition announcement to messages
+    addSystemMessage('🎯 New competition round started! Submit your message to compete!', 'competition-start');
+});
+
+// Handle competition winner
+socket.on('competition-winner', (data) => {
+    competitionEndTime = null;
+    if (competitionInterval) {
+        clearInterval(competitionInterval);
+    }
+    
+    if (competitionStatus) {
+        competitionStatus.textContent = 'Winner selected! Next round starting soon...';
+        competitionStatus.className = 'status-waiting';
+    }
+    
+    // Add winner announcement
+    const winnerMessage = document.createElement('div');
+    winnerMessage.className = 'message winner-message';
+    winnerMessage.innerHTML = `
+        <div class="winner-banner">
+            🏆 Winning Message!
+            <div class="score">Score: ${Math.round(data.score * 10) / 10}</div>
+        </div>
+        <div class="message-content">
+            <strong>${data.userName}</strong>: ${data.message}
+        </div>
+        <div class="kaia-response">
+            <div class="response-header">
+                <span class="ai-indicator">🎙️ Kaia's Response:</span>
+            </div>
+            ${data.response}
+        </div>
+    `;
+    
+    messagesContainer.prepend(winnerMessage);
+    winnerMessage.scrollIntoView({ behavior: 'smooth' });
+});
+
+// Handle competition state
+socket.on('competition-state', (data) => {
+    if (data.isActive) {
+        competitionEndTime = data.endTime;
+        if (competitionStatus) {
+            competitionStatus.textContent = 'Competition Active!';
+            competitionStatus.className = 'status-active';
+        }
+        if (competitionInterval) {
+            clearInterval(competitionInterval);
+        }
+        competitionInterval = setInterval(updateCompetitionTimer, 100);
+    }
+});
+
+// Handle message errors
+socket.on('message-error', (data) => {
+    addSystemMessage(data.message, 'error');
+});
 
 // Initialize message handling
 function initializeMessageHandling() {
     const messageForm = document.getElementById('message-form');
-    const nameInput = document.getElementById('name-input');
-
+    
     if (!messageForm || !messageInput || !nameInput) {
         console.error('Required form elements not found!');
         return;
     }
-
-    // Handle form submission
+    
     messageForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        console.log('Form submitted');
         
         const message = messageInput.value.trim();
         const name = nameInput.value.trim() || 'Anonymous';
         
         if (message) {
-            console.log('Sending message:', message);
             const messageId = Date.now().toString();
             const messageData = {
                 message: message,
                 userId: localStorage.getItem('userId') || 'user-' + messageId,
                 userName: name,
                 messageId: messageId,
-                deviceId: deviceId,
-                timestamp: new Date().toISOString()
+                timestamp: Date.now()
             };
-
-            // Add user message to the feed immediately
-            const messagesDiv = ensureMessagesContainer();
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.className = 'message user-message';
-            userMessageDiv.innerHTML = `
-                <div class="message-header">
-                    <strong style="color: #3399ff">${name}</strong>
-                    <span class="timestamp">${new Date().toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit',
-                        hour12: true 
-                    }).toUpperCase()}</span>
-                </div>
-                <div class="message-content">${message}</div>
-            `;
-            messagesDiv.appendChild(userMessageDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
+            
+            // Add user message to the feed
+            addMessage(messageData, true);
+            
             // Send message to server
-            if (socket.connected) {
-                console.log('Socket connected, sending message directly');
-                socket.emit('send-message', messageData, (error) => {
-                    if (error) {
-                        console.error('Error sending message:', error);
-                        addSystemMessage('Error sending message. Please try again.', 'error');
-                    } else {
-                        console.log('Message sent successfully');
-                        messageInput.value = '';
-                        messageInput.focus();
-                    }
-                });
-            } else {
-                console.log('Socket not connected, queueing message');
-                messageQueue.push(messageData);
-                messageInput.value = '';
-                messageInput.focus();
-                addSystemMessage('Message queued. Waiting for connection...', 'info');
-            }
+            socket.emit('send-message', messageData);
+            
+            // Clear input
+            messageInput.value = '';
+            messageInput.focus();
         }
     });
-
-    // Handle Enter key press
-    messageInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            messageForm.dispatchEvent(new Event('submit'));
-        }
-    });
-
-    // Update listener count periodically
-    function updateListenerCount() {
-        const listenerCount = document.getElementById('listenerCount');
-        if (listenerCount) {
-            const randomCount = Math.floor(Math.random() * (14000 - 11000 + 1)) + 11000;
-            listenerCount.textContent = randomCount.toLocaleString();
-        }
-    }
-
-    // Update listener count every 30 seconds
-    updateListenerCount();
-    setInterval(updateListenerCount, 30000);
 }
 
-// Socket event handlers with improved logging
-socket.on('connect', () => {
-    console.log('Connected to server successfully');
-    addSystemMessage('Connected to server', 'success');
-    processMessageQueue();
-});
-
-socket.on('connect_error', (error) => {
-    console.error('Connection error:', error);
-    addSystemMessage('Connection error. Retrying...', 'error');
-    
-    if (socket.io.engine?.transport?.name === 'websocket') {
-        console.log('Falling back to polling transport');
-        socket.io.opts.transports = ['polling'];
-    }
-});
-
-socket.on('disconnect', (reason) => {
-    console.log('Disconnected from server:', reason);
-    addSystemMessage('Disconnected from server. Attempting to reconnect...', 'error');
-    
-    if (!socket.connected) {
-        setTimeout(() => {
-            console.log('Attempting to reconnect...');
-            socket.connect();
-        }, 2000);
-    }
-});
-
-// Handle incoming messages with improved logging
-socket.on('new-message', (data) => {
-    console.log('Received message:', data);
-    const messagesDiv = ensureMessagesContainer();
-
+// Add a message to the feed
+function addMessage(data, isUser = false) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = data.isAI ? 'message ai-message' : 'message user-message';
+    messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
     
-    const messageHeader = document.createElement('div');
-    messageHeader.className = 'message-header';
-    
-    const userName = document.createElement('strong');
-    userName.textContent = data.userName || 'Unknown User';
-    userName.style.color = data.isAI ? '#ff3366' : '#3399ff';
-    
-    const timestamp = document.createElement('span');
-    timestamp.className = 'timestamp';
-    timestamp.textContent = new Date().toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-    }).toUpperCase();
-    
-    messageHeader.appendChild(userName);
-    messageHeader.appendChild(timestamp);
-    
-    const messageContent = document.createElement('div');
-    messageContent.className = 'message-content';
-    
-    if (data.isAI && data.message.startsWith('Responding to')) {
-        const messageParts = data.message.split('...');
-        if (messageParts.length > 1) {
-            const responseContext = document.createElement('div');
-            responseContext.style.color = 'rgba(255, 255, 255, 0.5)';
-            responseContext.style.marginBottom = '0.5rem';
-            responseContext.textContent = messageParts[0] + '...';
-            messageContent.appendChild(responseContext);
-            messageContent.appendChild(document.createTextNode(messageParts[1].trim()));
-        } else {
-            messageContent.textContent = data.message;
-        }
+    if (data.isCompeting) {
+        messageDiv.innerHTML = `
+            <div class="competing-badge">🎯 Competing</div>
+            <div class="message-content">
+                <strong>${data.userName}</strong>: ${data.message}
+            </div>
+            ${data.score ? `
+                <div class="message-score">
+                    Score: ${Math.round(data.score * 10) / 10}
+                </div>
+            ` : ''}
+        `;
     } else {
-        messageContent.textContent = data.message;
+        messageDiv.innerHTML = `
+            <div class="message-content">
+                <strong>${data.userName}</strong>: ${data.message}
+            </div>
+        `;
     }
     
-    messageDiv.appendChild(messageHeader);
-    messageDiv.appendChild(messageContent);
-    
-    messageDiv.dataset.messageId = data.messageId || Date.now().toString();
-    messageDiv.dataset.deviceId = data.deviceId || deviceId;
-    
-    messagesDiv.appendChild(messageDiv);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    messagesContainer.prepend(messageDiv);
+    messageDiv.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Add a system message
+function addSystemMessage(message, type = '') {
+    const systemMessage = document.createElement('div');
+    systemMessage.className = `system-message ${type}`;
+    systemMessage.textContent = message;
+    messagesContainer.prepend(systemMessage);
+    systemMessage.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Socket event handlers
+socket.on('connect', () => {
+    addSystemMessage('Connected to server', 'success');
 });
 
-// Handle audio playback
-socket.on('play-audio', (data) => {
-    console.log('Received audio data:', data);
-    if (!data.audioPath) {
-        console.error('No audio path received');
-        socket.emit('audio-complete');
-        return;
-    }
-
-    // Ensure the audio path starts with a slash
-    const audioPath = data.audioPath.startsWith('/') ? data.audioPath : '/' + data.audioPath;
-    const fullAudioUrl = 'https://ask-kaia.onrender.com' + audioPath;
-    console.log('Attempting to play audio from:', fullAudioUrl);
-
-    const audio = new Audio(fullAudioUrl);
-    
-    audio.oncanplay = () => {
-        console.log('Audio can play, starting playback');
-        audio.play().catch(error => {
-            console.error('Failed to play audio:', error);
-            socket.emit('audio-complete');
-        });
-    };
-
-    audio.onended = () => {
-        console.log('Audio playback completed');
-        socket.emit('audio-complete');
-    };
-
-    audio.onerror = (error) => {
-        console.error('Audio playback error:', error);
-        console.error('Audio error details:', {
-            error: error,
-            src: audio.src,
-            networkState: audio.networkState,
-            readyState: audio.readyState
-        });
-        socket.emit('audio-complete');
-    };
-
-    // Add a timeout in case audio fails to load
-    setTimeout(() => {
-        if (audio.paused) {
-            console.error('Audio playback timeout - sending completion signal');
-            console.error('Audio state at timeout:', {
-                src: audio.src,
-                networkState: audio.networkState,
-                readyState: audio.readyState,
-                error: audio.error
-            });
-            socket.emit('audio-complete');
-        }
-    }, 10000);
+socket.on('disconnect', () => {
+    addSystemMessage('Disconnected from server. Attempting to reconnect...', 'error');
 });
 
-// Handle errors
 socket.on('error', (error) => {
-    console.error('Server error:', error);
-    addSystemMessage('Error: ' + error.message, 'error');
+    addSystemMessage(error.message, 'error');
 });
-
-function processMessageQueue() {
-    if (!socket.connected || isProcessing || messageQueue.length === 0) {
-        return;
-    }
-
-    isProcessing = true;
-    const message = messageQueue.shift();
-    
-    socket.emit('send-message', message, (error) => {
-        isProcessing = false;
-        if (error) {
-            console.error('Error sending message:', error);
-            messageQueue.unshift(message);
-        }
-        processMessageQueue();
-    });
-}
-
-// Add styles
-const style = document.createElement('style');
-style.textContent = `
-.message {
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 8px;
-    max-width: 80%;
-    word-wrap: break-word;
-}
-
-.user-message {
-    background-color: #e3f2fd;
-    margin-left: auto;
-    margin-right: 10px;
-    color: #1565c0;
-}
-
-.ai-message {
-    background-color: #fce4ec;
-    margin-left: 10px;
-    margin-right: auto;
-    color: #c2185b;
-}
-
-.timestamp {
-    font-size: 0.8em;
-    color: #666;
-    margin-right: 8px;
-}
-
-.system-message {
-    text-align: center;
-    color: #666;
-    font-style: italic;
-    margin: 5px 0;
-    font-size: 0.9em;
-}
-
-.system-message.error {
-    color: #d32f2f;
-}
-
-.system-message.success {
-    color: #388e3c;
-}
-
-.message-content {
-    display: inline-block;
-    margin-left: 5px;
-}
-`;
-document.head.appendChild(style);
 
 // Message Handling
 function addMessage(message, isUser = false) {
@@ -568,4 +461,136 @@ window.addEventListener('resize', () => {
     visualizationCanvas.width = visualizationCanvas.clientWidth;
     visualizationCanvas.height = visualizationCanvas.clientHeight;
     drawVisualization();
-}); 
+});
+
+// Add competition-specific styles
+const style = document.createElement('style');
+style.textContent = `
+    .competition-section {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .competition-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .competition-header h2 {
+        color: var(--primary-color);
+        margin: 0;
+    }
+
+    #competition-status {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9em;
+    }
+
+    #competition-status.status-active {
+        background: rgba(0, 255, 0, 0.1);
+        color: #00ff00;
+    }
+
+    #competition-status.status-waiting {
+        background: rgba(255, 255, 0, 0.1);
+        color: #ffff00;
+    }
+
+    #competition-timer {
+        font-family: monospace;
+        font-size: 1.2em;
+        color: var(--primary-color);
+    }
+
+    .competition-rules {
+        background: rgba(255, 255, 255, 0.03);
+        padding: 15px;
+        border-radius: 8px;
+    }
+
+    .competition-rules ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 10px 0 0;
+    }
+
+    .competition-rules li {
+        margin: 5px 0;
+        padding-left: 20px;
+        position: relative;
+    }
+
+    .competition-rules li:before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        color: var(--primary-color);
+    }
+
+    .competing-badge {
+        background: var(--primary-color);
+        color: black;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        display: inline-block;
+        margin-bottom: 8px;
+    }
+
+    .message-score {
+        font-size: 0.9em;
+        color: var(--primary-color);
+        margin-top: 8px;
+    }
+
+    .winner-message {
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 140, 0, 0.1));
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 12px;
+    }
+
+    .winner-banner {
+        background: linear-gradient(90deg, #ffd700, #ffa500);
+        color: black;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .winner-banner .score {
+        background: rgba(0, 0, 0, 0.1);
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.9em;
+    }
+
+    .kaia-response {
+        margin-top: 15px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+    }
+
+    .response-header {
+        margin-bottom: 10px;
+        color: var(--primary-color);
+    }
+
+    .system-message.competition-start {
+        background: linear-gradient(90deg, rgba(0, 240, 255, 0.1), rgba(255, 51, 102, 0.1));
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+`;
+document.head.appendChild(style); 

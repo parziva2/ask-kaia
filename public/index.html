@@ -3,176 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Experience the future of AI conversation with Kaia - An advanced AI assistant that understands and responds with human-like intelligence.">
-    <meta name="keywords" content="AI, artificial intelligence, chat, conversation, assistant, Kaia">
-    <title>Kaia - Advanced AI Assistant</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="description" content="Join Kaia's interactive AI talk show! Compete to have your messages featured and responded to live.">
+    <meta name="keywords" content="AI, chat, competition, interactive, talk show, Kaia">
+    <title>Ask Kaia - Interactive AI Talk Show</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div id="particles-js"></div>
-    <div class="noise-overlay"></div>
-
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">
-                <div class="logo-icon">K</div>
-                <div class="logo-text">KAIA</div>
-            </div>
-            <div class="nav-stats">
-                <div class="stat">
-                    <div class="stat-value">2,483</div>
-                    <div class="stat-label">CONVERSATIONS</div>
+    <div class="app-container">
+        <nav class="top-nav">
+            <div class="nav-content">
+                <div class="logo">
+                    <span class="logo-text">Ask Kaia</span>
+                    <div class="status-indicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text">LIVE</span>
+                    </div>
                 </div>
-                <div class="stat">
-                    <div class="stat-value">98%</div>
-                    <div class="stat-label">ACCURACY</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value">24/7</div>
-                    <div class="stat-label">AVAILABILITY</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span id="listener-count">0</span>
+                        <span class="stat-label">Listeners</span>
+                    </div>
+                    <div class="stat-item">
+                        <span id="message-count">0</span>
+                        <span class="stat-label">Messages</span>
+                    </div>
                 </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <section class="hero">
-        <div class="hero-content">
-            <div class="hero-text">
-                <div class="status-indicator">
-                    <div class="pulse"></div>
-                    <span class="status-text">AI SYSTEM ACTIVE</span>
-                </div>
-                <h1 class="glitch" data-text="Experience the Future of Conversation">Experience the Future of Conversation</h1>
+        <main class="main-content">
+            <div class="hero-section">
+                <h1>Join Kaia's Interactive AI Talk Show</h1>
                 <p class="hero-description">
-                    Engage with Kaia, an advanced AI assistant designed to understand, learn, and respond with human-like intelligence. Experience seamless communication enhanced by cutting-edge technology.
+                    Submit your messages and compete to have them featured! Every 30 seconds, 
+                    Kaia selects the most engaging message to respond to live.
                 </p>
-                <div class="hero-cta">
-                    <button class="primary-button">
-                        Start Conversation
-                        <span class="button-icon">→</span>
-                    </button>
+                <div class="interaction-sphere">
+                    <canvas id="sphere-animation"></canvas>
                 </div>
             </div>
-            <div class="interaction-sphere">
-                <canvas id="sphere-animation"></canvas>
-                <div class="sphere-stats">
-                    <svg class="stat-ring" viewBox="0 0 100 100">
-                        <circle class="progress-ring" cx="50" cy="50" r="45"/>
-                    </svg>
-                    <div class="ring-text">NEURAL PROCESSING</div>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <section class="interaction-zone">
-        <div class="zone-container">
-            <div class="message-stream">
-                <div class="messages-container"></div>
-                <div class="input-section">
-                    <div class="input-container">
-                        <input type="text" id="name-input" placeholder="Your name">
-                        <div class="message-input-wrapper">
-                            <input type="text" id="message-input" placeholder="Type your message...">
-                            <div class="input-effects">
-                                <div class="input-glow"></div>
-                            </div>
+            <div class="interaction-zone">
+                <!-- Competition section will be injected here by JavaScript -->
+                
+                <div class="message-input-section">
+                    <form id="message-form" class="message-form">
+                        <div class="input-group">
+                            <input type="text" 
+                                   id="name-input" 
+                                   placeholder="Your name" 
+                                   maxlength="30"
+                                   class="name-input">
+                            <input type="text" 
+                                   id="message-input" 
+                                   placeholder="Type your message to compete..." 
+                                   maxlength="200"
+                                   class="message-input">
+                            <button type="submit" class="send-button">Send</button>
                         </div>
-                        <button class="send-button">
-                            Send
-                            <div class="button-effects"></div>
-                        </button>
-                    </div>
+                    </form>
                 </div>
-            </div>
-            <div class="visualization-panel">
-                <div class="panel-header">
-                    <h3>Conversation Analytics</h3>
-                    <div class="panel-controls">
-                        <button class="panel-button active">Real-time</button>
-                        <button class="panel-button">History</button>
-                    </div>
-                </div>
-                <canvas id="visualization-canvas"></canvas>
-            </div>
-        </div>
-    </section>
 
-    <section class="insights-section">
-        <div class="insights-container">
-            <h2>Interaction Insights</h2>
-            <div class="insights-grid">
-                <div class="insight-card">
-                    <div class="insight-header">
-                        <span class="insight-icon">📊</span>
-                        <h3>Response Analysis</h3>
-                    </div>
-                    <div id="response-chart"></div>
-                </div>
-                <div class="insight-card">
-                    <div class="insight-header">
-                        <span class="insight-icon">🎯</span>
-                        <h3>Accuracy Metrics</h3>
-                    </div>
-                    <div id="accuracy-chart"></div>
-                </div>
-                <div class="insight-card">
-                    <div class="insight-header">
-                        <span class="insight-icon">⚡</span>
-                        <h3>Processing Speed</h3>
-                    </div>
-                    <div id="speed-chart"></div>
+                <div class="messages-container">
+                    <!-- Messages will be dynamically added here -->
                 </div>
             </div>
-        </div>
-    </section>
 
-    <footer class="site-footer">
-        <div class="footer-content">
-            <div class="footer-section">
-                <h3>About Kaia</h3>
-                <p>Kaia is an advanced AI assistant powered by cutting-edge machine learning algorithms and natural language processing. Our mission is to make AI interaction more natural and accessible.</p>
-            </div>
-            <div class="footer-section">
-                <h3>System Status</h3>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <div class="status-dot active"></div>
-                        <span>Neural Network</span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-dot active"></div>
-                        <span>Language Model</span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-dot active"></div>
-                        <span>Response Engine</span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-dot active"></div>
-                        <span>Learning Module</span>
-                    </div>
+            <div class="interaction-insights">
+                <div class="insight-card">
+                    <h3>How It Works</h3>
+                    <ul>
+                        <li>Submit your message during the competition round</li>
+                        <li>Messages are scored based on creativity and engagement</li>
+                        <li>Every 30 seconds, Kaia picks the most interesting message</li>
+                        <li>Winners receive special responses from Kaia</li>
+                    </ul>
+                </div>
+                <div class="insight-card">
+                    <h3>Tips for Winning</h3>
+                    <ul>
+                        <li>Ask thought-provoking questions</li>
+                        <li>Share unique perspectives</li>
+                        <li>Be creative and engaging</li>
+                        <li>Keep messages clear and concise</li>
+                    </ul>
                 </div>
             </div>
-            <div class="footer-section">
-                <h3>Capabilities</h3>
-                <ul>
-                    <li>Natural Language Understanding</li>
-                    <li>Context-Aware Responses</li>
-                    <li>Real-time Learning</li>
-                    <li>Multi-turn Conversations</li>
-                </ul>
+        </main>
+
+        <footer class="app-footer">
+            <div class="footer-content">
+                <div class="system-status">
+                    <span class="status-dot"></span>
+                    System Status: Online
+                </div>
+                <p class="footer-description">
+                    Kaia is an AI host that engages with the audience through a competitive 
+                    message selection system, creating an interactive and dynamic conversation experience.
+                </p>
             </div>
-        </div>
-        <div class="footer-bottom">
-            <p>&copy; 2024 Kaia AI. All rights reserved.</p>
-        </div>
-    </footer>
+        </footer>
+    </div>
 
     <script src="script.js"></script>
 </body>
