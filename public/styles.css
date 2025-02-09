@@ -14,9 +14,13 @@
 }
 
 body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a1a, #2d1f3d);
+    color: #fff;
+    -webkit-tap-highlight-color: transparent;
     font-family: 'Inter', sans-serif;
-    background-color: var(--background-color);
-    color: var(--text-color);
     line-height: 1.6;
     overflow-x: hidden;
 }
@@ -441,48 +445,71 @@ body {
 /* Audio Controls */
 #audio-container {
     position: fixed;
-    bottom: 70px;
+    bottom: 0;
     left: 0;
     right: 0;
     z-index: 1000;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 10px;
+    background: rgba(10, 10, 10, 0.95);
+    padding: 12px;
     text-align: center;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .now-playing {
     font-size: 14px;
-    color: #333;
+    color: rgba(255, 255, 255, 0.9);
     margin: 5px 0;
     min-height: 20px;
 }
 
 .audio-controls {
     position: fixed;
-    bottom: 120px;
+    bottom: 80px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1001;
+    width: auto;
+    text-align: center;
 }
 
 #enable-audio {
-    background: #ff3366;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 14px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-size: 15px;
     cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 #enable-audio:hover {
-    background: #ff1a4d;
+    background: rgba(255, 255, 255, 0.15);
     transform: translateY(-1px);
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+#enable-audio:active {
+    transform: translateY(1px);
+}
+
+/* Fix iOS appearance */
+@supports (-webkit-touch-callout: none) {
+    body {
+        background-attachment: fixed;
+    }
+    
+    .app-container {
+        min-height: -webkit-fill-available;
+    }
+    
+    .top-nav {
+        background: rgba(10, 10, 10, 0.95);
+    }
 }
 
 /* Mobile-specific styles */

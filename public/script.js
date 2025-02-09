@@ -686,84 +686,127 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Initialize audio elements
+// Initialize audio elements with better iOS support
 const responseAudio = document.getElementById('response-audio');
 const enableAudioButton = document.getElementById('enable-audio');
 let audioContext = null;
 let audioInitialized = false;
+let audioInitializationAttempts = 0;
+const MAX_INIT_ATTEMPTS = 3;
 
-// Function to initialize audio
-function initializeAudio() {
-    if (audioInitialized) return;
+// Function to initialize audio with retry logic
+async function initializeAudio() {
+    if (audioInitialized) return true;
+    
+    if (audioInitializationAttempts >= MAX_INIT_ATTEMPTS) {
+        console.error('Failed to initialize audio after multiple attempts');
+        return false;
+    }
     
     try {
+        audioInitializationAttempts++;
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioContext();
         
-        // Show enable audio button on iOS
+        // For iOS, we need to resume the context after user interaction
         if (audioContext.state === 'suspended') {
             enableAudioButton.style.display = 'block';
+            enableAudioButton.onclick = async () => {
+                try {
+                    await audioContext.resume();
+                    enableAudioButton.style.display = 'none';
+                    audioInitialized = true;
+                    // Try playing any pending audio
+                    if (currentAudioUrl && currentAudioText) {
+                        playAudioResponse(currentAudioUrl, currentAudioText);
+                    }
+                } catch (error) {
+                    console.error('Error resuming audio context:', error);
+                }
+            };
+            return false;
         }
         
         audioInitialized = true;
-        console.log('Audio initialized successfully');
+        return true;
     } catch (error) {
         console.error('Error initializing audio:', error);
+        return false;
     }
 }
 
-// Handle enable audio button click
-enableAudioButton.addEventListener('click', async () => {
-    try {
-        if (audioContext && audioContext.state === 'suspended') {
-            await audioContext.resume();
-        }
-        enableAudioButton.style.display = 'none';
-        console.log('Audio context resumed');
-    } catch (error) {
-        console.error('Error enabling audio:', error);
-    }
-});
+// Store current audio info for retry
+let currentAudioUrl = null;
+let currentAudioText = null;
 
-// Initialize audio on first user interaction
-document.addEventListener('touchstart', initializeAudio, { once: true });
-document.addEventListener('click', initializeAudio, { once: true });
-
-// Handle audio playback
-function playAudioResponse(audioUrl, text) {
+// Enhanced audio playback function with better iOS support
+async function playAudioResponse(audioUrl, text) {
     if (!audioUrl) return;
     
-    // Initialize audio if not already done
+    currentAudioUrl = audioUrl;
+    currentAudioText = text;
+    
+    // Try to initialize audio if not already done
     if (!audioInitialized) {
-        initializeAudio();
+        const initialized = await initializeAudio();
+        if (!initialized) {
+            console.log('Waiting for user interaction to initialize audio...');
+            return;
+        }
     }
     
     // Update UI
-    nowPlaying.innerHTML = `🎙️ Loading: ${text || ''}`;
+    if (nowPlaying) {
+        nowPlaying.innerHTML = `🎙️ Loading: ${text || ''}`;
+    }
     
     // Configure audio element
     responseAudio.src = audioUrl.startsWith('http') ? audioUrl : `${window.location.origin}${audioUrl}`;
     responseAudio.load();
     
-    // Play audio with error handling
-    const playPromise = responseAudio.play();
-    if (playPromise !== undefined) {
-        playPromise.then(() => {
+    // Play audio with retry logic
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const attemptPlay = async () => {
+        try {
+            await responseAudio.play();
             console.log('Audio playing successfully');
-            nowPlaying.innerHTML = `🎙️ Now Playing: ${text || ''}`;
-        }).catch(error => {
+            if (nowPlaying) {
+                nowPlaying.innerHTML = `🎙️ Now Playing: ${text || ''}`;
+            }
+        } catch (error) {
             console.error('Error playing audio:', error);
-            nowPlaying.innerHTML = '❌ Tap to retry audio';
-            nowPlaying.onclick = () => playAudioResponse(audioUrl, text);
-        });
-    }
+            retryCount++;
+            
+            if (retryCount < maxRetries) {
+                console.log(`Retrying playback (${retryCount}/${maxRetries})...`);
+                setTimeout(attemptPlay, 1000);
+            } else {
+                if (nowPlaying) {
+                    nowPlaying.innerHTML = '❌ Tap to retry audio';
+                    nowPlaying.onclick = () => playAudioResponse(audioUrl, text);
+                }
+            }
+        }
+    };
+    
+    await attemptPlay();
 }
 
 // Handle audio completion
 responseAudio.addEventListener('ended', () => {
-    nowPlaying.innerHTML = '';
+    if (nowPlaying) {
+        nowPlaying.innerHTML = '';
+    }
+    currentAudioUrl = null;
+    currentAudioText = null;
     socket.emit('audio-complete');
 });
+
+// Initialize audio on user interaction
+document.addEventListener('touchstart', initializeAudio, { once: true });
+document.addEventListener('click', initializeAudio, { once: true });
 
 // Handle audio playback events
 socket.on('play-audio', (data) => {
