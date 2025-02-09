@@ -693,7 +693,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }, 3000);
-});
+}); 
 
 // Add socket connection error handling
 socket.on('connect_error', (error) => {

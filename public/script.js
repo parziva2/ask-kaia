@@ -14,6 +14,12 @@ const listenerCount = document.getElementById('listener-count');
 const slotsAvailable = document.getElementById('slots-available');
 const mainPlayButton = document.getElementById('main-play-button');
 const nowPlaying = document.getElementById('now-playing');
+const messagesContainer = document.querySelector('.messages-container');
+const nameInput = document.getElementById('name-input');
+const messageInput = document.getElementById('message-input');
+const sendButton = document.querySelector('.send-button');
+const visualizationCanvas = document.getElementById('visualization-canvas');
+const sphereCanvas = document.getElementById('sphere-animation');
 
 // Track current audio state
 let currentAudio = null;
@@ -31,6 +37,74 @@ let messageQueue = [];
 let isProcessing = false;
 let deviceId = localStorage.getItem('deviceId') || 'device_' + Math.random().toString(36).substr(2, 9);
 localStorage.setItem('deviceId', deviceId);
+
+// Three.js Scene Setup
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, sphereCanvas.clientWidth / sphereCanvas.clientHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas: sphereCanvas, alpha: true });
+renderer.setSize(sphereCanvas.clientWidth, sphereCanvas.clientHeight);
+
+// Create Sphere
+const geometry = new THREE.IcosahedronGeometry(1, 2);
+const material = new THREE.MeshPhongMaterial({
+    color: 0x00f0ff,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.8
+});
+const sphere = new THREE.Mesh(geometry, material);
+scene.add(sphere);
+
+// Add Lights
+const light = new THREE.PointLight(0xff3366, 1, 100);
+light.position.set(10, 10, 10);
+scene.add(light);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+
+camera.position.z = 2.5;
+
+// Animation Variables
+let targetRotation = { x: 0, y: 0 };
+const rotationSpeed = 0.01;
+let pulseScale = 1;
+const pulseSpeed = 0.02;
+
+// Particle System
+const particlesGeometry = new THREE.BufferGeometry();
+const particleCount = 1000;
+const positions = new Float32Array(particleCount * 3);
+
+for (let i = 0; i < particleCount * 3; i += 3) {
+    positions[i] = (Math.random() - 0.5) * 10;
+    positions[i + 1] = (Math.random() - 0.5) * 10;
+    positions[i + 2] = (Math.random() - 0.5) * 10;
+}
+
+particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+const particlesMaterial = new THREE.PointsMaterial({
+    color: 0x00f0ff,
+    size: 0.02,
+    transparent: true,
+    opacity: 0.5
+});
+
+const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
+scene.add(particleSystem);
+
+// Visualization Setup
+const ctx = visualizationCanvas.getContext('2d');
+let visualizationData = [];
+const maxDataPoints = 100;
+
+// Input Effects
+messageInput.addEventListener('mousemove', (e) => {
+    const rect = messageInput.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    messageInput.style.setProperty('--x', `${x}px`);
+    messageInput.style.setProperty('--y', `${y}px`);
+});
 
 // Create messages container if it doesn't exist
 function ensureMessagesContainer() {
@@ -57,7 +131,6 @@ function addSystemMessage(message, type = '') {
 // Initialize message handling
 function initializeMessageHandling() {
     const messageForm = document.getElementById('message-form');
-    const messageInput = document.getElementById('message-input');
     const nameInput = document.getElementById('name-input');
 
     if (!messageForm || !messageInput || !nameInput) {
@@ -363,4 +436,136 @@ style.textContent = `
     margin-left: 5px;
 }
 `;
-document.head.appendChild(style); 
+document.head.appendChild(style);
+
+// Message Handling
+function addMessage(message, isUser = false) {
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', isUser ? 'user-message' : 'ai-message');
+    
+    const header = document.createElement('div');
+    header.classList.add('message-header');
+    
+    const name = document.createElement('span');
+    name.textContent = isUser ? nameInput.value || 'User' : 'Kaia';
+    header.appendChild(name);
+    
+    const time = document.createElement('span');
+    time.textContent = new Date().toLocaleTimeString();
+    header.appendChild(time);
+    
+    const content = document.createElement('div');
+    content.classList.add('message-content');
+    content.textContent = message;
+    
+    messageElement.appendChild(header);
+    messageElement.appendChild(content);
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Update visualization data
+    updateVisualization(message.length);
+}
+
+function updateVisualization(value) {
+    visualizationData.push(value);
+    if (visualizationData.length > maxDataPoints) {
+        visualizationData.shift();
+    }
+    
+    drawVisualization();
+}
+
+function drawVisualization() {
+    const width = visualizationCanvas.width;
+    const height = visualizationCanvas.height;
+    
+    ctx.clearRect(0, 0, width, height);
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    const step = width / maxDataPoints;
+    const scale = height / Math.max(...visualizationData, 50);
+    
+    visualizationData.forEach((value, index) => {
+        const x = index * step;
+        const y = height - (value * scale);
+        
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    
+    ctx.stroke();
+}
+
+// Animation Loop
+function animate() {
+    requestAnimationFrame(animate);
+    
+    // Rotate sphere
+    sphere.rotation.x += (targetRotation.x - sphere.rotation.x) * rotationSpeed;
+    sphere.rotation.y += (targetRotation.y - sphere.rotation.y) * rotationSpeed;
+    
+    // Pulse effect
+    pulseScale += Math.sin(Date.now() * 0.001) * pulseSpeed;
+    sphere.scale.set(pulseScale, pulseScale, pulseScale);
+    
+    // Rotate particles
+    particleSystem.rotation.y += 0.001;
+    
+    renderer.render(scene, camera);
+}
+
+// Event Listeners
+sphereCanvas.addEventListener('mousemove', (e) => {
+    const rect = sphereCanvas.getBoundingClientRect();
+    targetRotation.x = ((e.clientY - rect.top) / sphereCanvas.clientHeight - 0.5) * Math.PI;
+    targetRotation.y = ((e.clientX - rect.left) / sphereCanvas.clientWidth - 0.5) * Math.PI;
+});
+
+sendButton.addEventListener('click', () => {
+    const message = messageInput.value.trim();
+    if (message) {
+        socket.emit('chat message', {
+            name: nameInput.value || 'User',
+            message: message
+        });
+        addMessage(message, true);
+        messageInput.value = '';
+    }
+});
+
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendButton.click();
+    }
+});
+
+// Socket Events
+socket.on('chat message', (data) => {
+    if (data.name !== (nameInput.value || 'User')) {
+        addMessage(data.message);
+    }
+});
+
+// Initialize
+animate();
+
+// Resize handling
+window.addEventListener('resize', () => {
+    // Update Three.js canvas
+    camera.aspect = sphereCanvas.clientWidth / sphereCanvas.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(sphereCanvas.clientWidth, sphereCanvas.clientHeight);
+    
+    // Update visualization canvas
+    visualizationCanvas.width = visualizationCanvas.clientWidth;
+    visualizationCanvas.height = visualizationCanvas.clientHeight;
+    drawVisualization();
+}); 
