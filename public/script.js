@@ -641,7 +641,7 @@ function initializeAudio() {
     document.addEventListener('click', initializeAudioContext, { once: true });
 }
 
-// Function to initialize audio context
+// Function to initialize audio context with retry mechanism
 async function initializeAudioContext() {
     try {
         console.log('Initializing audio context...');
@@ -682,6 +682,14 @@ async function initializeAudioContext() {
         audioInitialized = true;
         audioEnabled = true;
         localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
+        
+        // Update button state
+        const audioButton = document.getElementById('enable-audio-button');
+        if (audioButton) {
+            audioButton.innerHTML = '🔊';
+            audioButton.classList.remove('disabled');
+            audioButton.setAttribute('aria-label', 'Mute Audio');
+        }
         
         return true;
     } catch (error) {
@@ -802,7 +810,7 @@ async function playAudioResponse(audioUrl, text) {
     }
 }
 
-// Add floating audio enable button for iOS
+// Add floating audio enable button for iOS with improved touch handling
 function addAudioEnableButton() {
     const button = document.createElement('button');
     button.id = 'enable-audio-button';
@@ -810,18 +818,51 @@ function addAudioEnableButton() {
     button.className = 'floating-audio-button' + (!audioEnabled ? ' disabled' : '');
     button.setAttribute('aria-label', audioEnabled ? 'Mute Audio' : 'Enable Audio');
     
-    button.onclick = async () => {
+    // Add touch feedback styles
+    button.style.transition = 'transform 0.1s ease-in-out, opacity 0.2s ease-in-out';
+    
+    // Prevent default touch behavior
+    button.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        button.style.transform = 'scale(0.95)';
+    }, { passive: false });
+    
+    button.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        button.style.transform = 'scale(1)';
+    }, { passive: false });
+    
+    // Debounce the click/touch handler
+    let isHandlingClick = false;
+    const handleClick = async (e) => {
+        e.preventDefault();
+        if (isHandlingClick) return;
+        isHandlingClick = true;
+        
         try {
             if (!audioEnabled) {
                 console.log('Attempting to enable audio...');
+                button.disabled = true; // Prevent multiple clicks
+                
                 // Close existing context if it exists
                 if (audioContext) {
-                    await audioContext.close();
+                    try {
+                        await audioContext.close();
+                    } catch (error) {
+                        console.error('Error closing audio context:', error);
+                    }
                     audioContext = null;
                 }
                 audioInitialized = false;
                 
-                const success = await initializeAudioContext();
+                // Try to initialize audio multiple times if needed
+                let success = false;
+                for (let i = 0; i < 3 && !success; i++) {
+                    if (i > 0) console.log(`Retry attempt ${i + 1}...`);
+                    success = await initializeAudioContext();
+                    if (!success) await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
                 if (success) {
                     console.log('Audio initialization successful');
                     audioEnabled = true;
@@ -836,7 +877,10 @@ function addAudioEnableButton() {
                         await playAudioResponse(nextMessage.audioUrl, nextMessage.text);
                     }
                 } else {
-                    console.error('Failed to initialize audio');
+                    console.error('Failed to initialize audio after multiple attempts');
+                    // Show feedback to user
+                    button.classList.add('error');
+                    setTimeout(() => button.classList.remove('error'), 2000);
                 }
             } else {
                 console.log('Disabling audio...');
@@ -852,7 +896,11 @@ function addAudioEnableButton() {
                     responseAudio.currentTime = 0;
                 }
                 if (audioContext) {
-                    await audioContext.close();
+                    try {
+                        await audioContext.close();
+                    } catch (error) {
+                        console.error('Error closing audio context:', error);
+                    }
                     audioContext = null;
                 }
                 audioInitialized = false;
@@ -862,10 +910,41 @@ function addAudioEnableButton() {
             }
         } catch (error) {
             console.error('Error toggling audio:', error);
+            // Show error feedback
+            button.classList.add('error');
+            setTimeout(() => button.classList.remove('error'), 2000);
+        } finally {
+            button.disabled = false;
+            isHandlingClick = false;
         }
     };
     
+    // Add both click and touch handlers
+    button.addEventListener('click', handleClick);
+    button.addEventListener('touchend', handleClick);
+    
     document.body.appendChild(button);
+    
+    // Add error state styles
+    const errorStyle = document.createElement('style');
+    errorStyle.textContent = `
+        .floating-audio-button.error {
+            animation: shake 0.5s ease-in-out;
+            border-color: #ff3366;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .floating-audio-button:disabled {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+    `;
+    document.head.appendChild(errorStyle);
 }
 
 // Handle audio completion
