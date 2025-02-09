@@ -3,6 +3,7 @@ const socket = io({
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
+    path: '/socket.io',
     transports: ['websocket', 'polling']
 });
 
@@ -38,6 +39,9 @@ let competitionInterval = null;
 document.addEventListener('DOMContentLoaded', () => {
     initializeMessageHandling();
     initializeCompetitionUI();
+    
+    // Add initial system message
+    addSystemMessage('Connected to Kaia\'s Talk Show! Send a message to participate.', 'success');
 });
 
 let messageQueue = [];
@@ -45,62 +49,67 @@ let isProcessing = false;
 let deviceId = localStorage.getItem('deviceId') || 'device_' + Math.random().toString(36).substr(2, 9);
 localStorage.setItem('deviceId', deviceId);
 
-// Three.js Scene Setup
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, sphereCanvas.clientWidth / sphereCanvas.clientHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas: sphereCanvas, alpha: true });
-renderer.setSize(sphereCanvas.clientWidth, sphereCanvas.clientHeight);
-
-// Create Sphere
-const geometry = new THREE.IcosahedronGeometry(1, 2);
-const material = new THREE.MeshPhongMaterial({
-    color: 0x00f0ff,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.8
-});
-const sphere = new THREE.Mesh(geometry, material);
-scene.add(sphere);
-
-// Add Lights
-const light = new THREE.PointLight(0xff3366, 1, 100);
-light.position.set(10, 10, 10);
-scene.add(light);
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
-
-camera.position.z = 2.5;
-
-// Animation Variables
-let targetRotation = { x: 0, y: 0 };
-const rotationSpeed = 0.01;
-let pulseScale = 1;
-const pulseSpeed = 0.02;
-
-// Particle System
-const particlesGeometry = new THREE.BufferGeometry();
-const particleCount = 1000;
-const positions = new Float32Array(particleCount * 3);
-
-for (let i = 0; i < particleCount * 3; i += 3) {
-    positions[i] = (Math.random() - 0.5) * 10;
-    positions[i + 1] = (Math.random() - 0.5) * 10;
-    positions[i + 2] = (Math.random() - 0.5) * 10;
+// Three.js Scene Setup - Only initialize if canvas exists
+if (sphereCanvas) {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, sphereCanvas.clientWidth / sphereCanvas.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas: sphereCanvas, alpha: true });
+    renderer.setSize(sphereCanvas.clientWidth, sphereCanvas.clientHeight);
+    
+    // Create Sphere
+    const geometry = new THREE.IcosahedronGeometry(1, 2);
+    const material = new THREE.MeshPhongMaterial({
+        color: 0x00f0ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.8
+    });
+    const sphere = new THREE.Mesh(geometry, material);
+    scene.add(sphere);
+    
+    // Add Lights
+    const light = new THREE.PointLight(0xff3366, 1, 100);
+    light.position.set(10, 10, 10);
+    scene.add(light);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    
+    camera.position.z = 2.5;
+    
+    // Animation Variables
+    let targetRotation = { x: 0, y: 0 };
+    const rotationSpeed = 0.01;
+    let pulseScale = 1;
+    const pulseSpeed = 0.02;
+    
+    // Animation Loop
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        // Rotate sphere
+        sphere.rotation.x += (targetRotation.x - sphere.rotation.x) * rotationSpeed;
+        sphere.rotation.y += (targetRotation.y - sphere.rotation.y) * rotationSpeed;
+        
+        // Pulse effect
+        pulseScale += Math.sin(Date.now() * 0.001) * pulseSpeed;
+        sphere.scale.set(pulseScale, pulseScale, pulseScale);
+        
+        renderer.render(scene, camera);
+    }
+    
+    // Start animation
+    animate();
+    
+    // Event Listeners
+    sphereCanvas.addEventListener('mousemove', (e) => {
+        const rect = sphereCanvas.getBoundingClientRect();
+        targetRotation.x = ((e.clientY - rect.top) / sphereCanvas.clientHeight - 0.5) * Math.PI;
+        targetRotation.y = ((e.clientX - rect.left) / sphereCanvas.clientWidth - 0.5) * Math.PI;
+    });
 }
 
-particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-const particlesMaterial = new THREE.PointsMaterial({
-    color: 0x00f0ff,
-    size: 0.02,
-    transparent: true,
-    opacity: 0.5
-});
-
-const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
-scene.add(particleSystem);
-
 // Visualization Setup
-const ctx = visualizationCanvas.getContext('2d');
+const ctx = visualizationCanvas ? visualizationCanvas.getContext('2d') : null;
 let visualizationData = [];
 const maxDataPoints = 100;
 
@@ -187,8 +196,9 @@ socket.on('competition-start', (data) => {
     addSystemMessage('🎯 New competition round started! Submit your message to compete!', 'competition-start');
 });
 
-// Handle competition winner
+// Handle competition winner with debug logging
 socket.on('competition-winner', (data) => {
+    console.log('Received competition winner:', data);  // Debug log
     competitionEndTime = null;
     if (competitionInterval) {
         clearInterval(competitionInterval);
@@ -250,6 +260,8 @@ socket.on('message-error', (data) => {
 // Initialize message handling
 function initializeMessageHandling() {
     const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const nameInput = document.getElementById('name-input');
     
     if (!messageForm || !messageInput || !nameInput) {
         console.error('Required form elements not found!');
@@ -263,6 +275,8 @@ function initializeMessageHandling() {
         const name = nameInput.value.trim() || 'Anonymous';
         
         if (message) {
+            console.log('Sending message:', message); // Debug log
+            
             // Create message data object
             const messageData = {
                 message: message,
@@ -272,17 +286,7 @@ function initializeMessageHandling() {
             };
             
             // Add message to UI immediately
-            const messageElement = document.createElement('div');
-            messageElement.className = 'message user-message';
-            messageElement.innerHTML = `
-                <div class="message-content">
-                    <strong>${messageData.userName}</strong>: ${messageData.message}
-                </div>
-                <div class="message-meta">
-                    <span class="timestamp">${new Date(messageData.timestamp).toLocaleTimeString()}</span>
-                </div>
-            `;
-            messagesContainer.prepend(messageElement);
+            addMessage(messageData, true);
             
             // Send message to server
             socket.emit('send-message', messageData);
@@ -302,10 +306,18 @@ function initializeMessageHandling() {
     });
 }
 
-// Add this new function to handle incoming messages
+// Handle incoming messages with debug logging
 socket.on('new-message', (data) => {
+    console.log('Received new message:', data);  // Debug log
+    addMessage(data);
+});
+
+// Add message to UI
+function addMessage(data, isUser = false) {
+    if (!messagesContainer) return;
+    
     const messageElement = document.createElement('div');
-    messageElement.className = `message ${data.isCompeting ? 'competing-message' : 'user-message'}`;
+    messageElement.className = `message ${isUser ? 'user-message' : ''} ${data.isCompeting ? 'competing-message' : ''}`;
     
     let content = `
         ${data.isCompeting ? '<div class="competing-badge">🎯 Competing</div>' : ''}
@@ -321,7 +333,7 @@ socket.on('new-message', (data) => {
     messageElement.innerHTML = content;
     messagesContainer.prepend(messageElement);
     messageElement.scrollIntoView({ behavior: 'smooth' });
-});
+}
 
 // Add a system message
 function addSystemMessage(message, type = '') {
@@ -341,7 +353,13 @@ socket.on('disconnect', () => {
     addSystemMessage('Disconnected from server. Attempting to reconnect...', 'error');
 });
 
+socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error);
+    addSystemMessage('Connection error. Trying to reconnect...', 'error');
+});
+
 socket.on('error', (error) => {
+    console.error('Socket error:', error);
     addSystemMessage(error.message, 'error');
 });
 
@@ -375,7 +393,10 @@ function addMessage(message, isUser = false) {
     updateVisualization(message.length);
 }
 
+// Only initialize visualization if canvas exists
 function updateVisualization(value) {
+    if (!ctx) return;  // Skip if canvas or context is not available
+    
     visualizationData.push(value);
     if (visualizationData.length > maxDataPoints) {
         visualizationData.shift();
@@ -385,6 +406,8 @@ function updateVisualization(value) {
 }
 
 function drawVisualization() {
+    if (!ctx || !visualizationCanvas) return;  // Skip if canvas or context is not available
+    
     const width = visualizationCanvas.width;
     const height = visualizationCanvas.height;
     
