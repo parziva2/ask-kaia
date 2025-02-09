@@ -35,6 +35,9 @@ const MAX_MESSAGES = 10;
 let competitionEndTime = null;
 let competitionInterval = null;
 
+// Track current audio state and processed responses
+let processedResponses = new Set(); // Track processed responses
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     initializeMessageHandling();
@@ -190,9 +193,28 @@ socket.on('competition-start', (data) => {
     competitionInterval = setInterval(updateCompetitionTimer, 100);
 });
 
-// Handle competition winner with debug logging
+// Socket event for listener count updates
+socket.on('listener-count', (count) => {
+    if (listenerCount) {
+        listenerCount.textContent = count;
+    }
+});
+
+// Handle competition winner with debug logging and duplicate prevention
 socket.on('competition-winner', (data) => {
     console.log('Received competition winner:', data);  // Debug log
+    
+    // Generate a unique response ID using message content and timestamp
+    const responseId = `${data.message}-${data.timestamp}`;
+    
+    // Don't process if this response was already handled
+    if (processedResponses.has(responseId)) {
+        console.log('Skipping duplicate response:', responseId);
+        return;
+    }
+    
+    // Add to processed responses
+    processedResponses.add(responseId);
     
     // Don't process if this winner was already announced
     const existingWinners = messagesContainer.querySelectorAll('.winner-message');
@@ -215,7 +237,8 @@ socket.on('competition-winner', (data) => {
     // Add winner announcement
     const winnerMessage = document.createElement('div');
     winnerMessage.className = 'message winner-message';
-    winnerMessage.dataset.messageId = String(data.timestamp); // Add unique identifier
+    winnerMessage.dataset.messageId = String(data.timestamp);
+    winnerMessage.dataset.responseId = responseId; // Add response ID to DOM
     winnerMessage.innerHTML = `
         <div class="winner-banner">
             🏆 Winning Message!
@@ -235,11 +258,18 @@ socket.on('competition-winner', (data) => {
     messagesContainer.prepend(winnerMessage);
     winnerMessage.scrollIntoView({ behavior: 'smooth' });
 
-    // Play audio response if available
-    if (data.audioUrl) {
+    // Play audio response if available and not already played
+    if (data.audioUrl && !processedResponses.has(data.audioUrl)) {
+        processedResponses.add(data.audioUrl);
         playAudioResponse(data.audioUrl, data.response);
     }
 });
+
+// Cleanup processed responses periodically to prevent memory leaks
+setInterval(() => {
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    processedResponses.clear(); // Clear old responses every hour
+}, 60 * 60 * 1000);
 
 // Handle competition state
 socket.on('competition-state', (data) => {
