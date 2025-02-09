@@ -279,20 +279,38 @@ async function endCompetitionRound() {
         const response = await generateResponse(winningMessage.message, winningMessage.userName, true);
         
         if (response) {
+            // Generate audio first
+            let audioUrl = null;
+            try {
+                audioUrl = await generateAudio(response, 'kaia');
+                console.log('Generated audio URL:', audioUrl);
+            } catch (error) {
+                console.error('Error generating audio:', error);
+            }
+            
+            // Broadcast winner with audio URL
             io.emit('competition-winner', {
                 userName: winningMessage.userName,
                 message: winningMessage.message,
                 response: response,
-                score: winningMessage.score
+                score: winningMessage.score,
+                audioUrl: audioUrl
             });
             
-            const audioResponse = await generateAudio(response, 'kaia');
-            if (audioResponse) {
+            // If audio was generated, broadcast play command
+            if (audioUrl) {
                 io.emit('play-audio', {
-                    audioPath: audioResponse,
+                    audioPath: audioUrl,
                     text: response
                 });
             }
+            
+            // Add to conversation history
+            state.conversationHistory.push({
+                ...winningMessage,
+                response,
+                audioUrl
+            });
         }
     } catch (error) {
         console.error('Error handling winning message:', error);

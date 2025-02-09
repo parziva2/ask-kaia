@@ -220,6 +220,11 @@ socket.on('competition-winner', (data) => {
     
     messagesContainer.prepend(winnerMessage);
     winnerMessage.scrollIntoView({ behavior: 'smooth' });
+
+    // Play audio response if available
+    if (data.audioUrl) {
+        playAudioResponse(data.audioUrl, data.response);
+    }
 });
 
 // Handle competition state
@@ -576,4 +581,46 @@ style.textContent = `
         font-weight: bold;
     }
 `;
-document.head.appendChild(style); 
+document.head.appendChild(style);
+
+// Add audio playback function
+function playAudioResponse(audioUrl, text) {
+    if (!audioUrl) return;
+    
+    // Stop any currently playing audio
+    if (currentAudioElement) {
+        currentAudioElement.pause();
+        currentAudioElement.src = '';
+    }
+    
+    // Create new audio element
+    currentAudioElement = new Audio();
+    currentAudioElement.src = audioUrl;
+    
+    // Update UI
+    if (nowPlaying) {
+        nowPlaying.innerHTML = `🎙️ Now Playing: ${text}`;
+    }
+    
+    // Play audio with error handling
+    currentAudioElement.play().catch(error => {
+        console.error('Error playing audio:', error);
+        if (nowPlaying) {
+            nowPlaying.innerHTML = '❌ Error playing audio';
+        }
+    });
+    
+    // Reset UI when audio ends
+    currentAudioElement.onended = () => {
+        if (nowPlaying) {
+            nowPlaying.innerHTML = 'Waiting for next winner...';
+        }
+    };
+}
+
+// Handle audio playback events
+socket.on('play-audio', (data) => {
+    if (data.audioPath && data.text) {
+        playAudioResponse(data.audioPath, data.text);
+    }
+}); 
