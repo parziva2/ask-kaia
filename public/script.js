@@ -630,23 +630,27 @@ async function initializeAudioContext() {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         if (!audioContext) {
             audioContext = new AudioContext();
+            console.log('Created new AudioContext, state:', audioContext.state);
         }
         
         // For iOS, we need to resume the context after user interaction
         if (audioContext.state === 'suspended') {
+            console.log('Resuming suspended AudioContext...');
             await audioContext.resume();
+            console.log('AudioContext resumed, new state:', audioContext.state);
         }
         
-        audioInitialized = true;
-        audioEnabled = true;
-        localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
-        
-        // Create and play a silent audio buffer to unlock audio
+        // Create and play a silent buffer (important for iOS)
         const silentBuffer = audioContext.createBuffer(1, 1, 22050);
         const source = audioContext.createBufferSource();
         source.buffer = silentBuffer;
         source.connect(audioContext.destination);
-        source.start();
+        source.start(0);
+        source.stop(0.001); // Extremely short duration
+        
+        audioInitialized = true;
+        audioEnabled = true;
+        localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
         
         return true;
     } catch (error) {
@@ -655,11 +659,19 @@ async function initializeAudioContext() {
     }
 }
 
+// Add iOS-specific initialization
+document.addEventListener('touchstart', async () => {
+    if (!audioInitialized) {
+        console.log('Initializing audio context on touchstart...');
+        await initializeAudioContext();
+    }
+}, { once: true });
+
 // Enhanced audio playback function with better iOS support
 async function playAudioResponse(audioUrl, text) {
     if (!audioUrl) return;
     
-    console.log('Attempting to play audio:', { audioEnabled, currentlyPlaying, audioInitialized });
+    console.log('Attempting to play audio:', { audioUrl, audioEnabled, currentlyPlaying, audioInitialized });
     
     if (!audioEnabled) {
         console.log('Audio not enabled, queueing message');
@@ -670,9 +682,10 @@ async function playAudioResponse(audioUrl, text) {
     try {
         // Initialize audio context if needed
         if (!audioInitialized || (audioContext && audioContext.state === 'suspended')) {
+            console.log('Initializing/resuming audio context...');
             const initialized = await initializeAudioContext();
             if (!initialized) {
-                console.log('Failed to initialize audio context');
+                console.error('Failed to initialize audio context');
                 return;
             }
         }
@@ -686,9 +699,11 @@ async function playAudioResponse(audioUrl, text) {
         
         currentlyPlaying = true;
         
+        // Clean up previous audio element
         if (currentAudioElement) {
             currentAudioElement.pause();
             currentAudioElement.src = '';
+            currentAudioElement.load(); // Important for iOS
             currentAudioElement = null;
         }
         
@@ -699,6 +714,7 @@ async function playAudioResponse(audioUrl, text) {
         audio.preload = 'auto';
         audio.playsInline = true;
         audio.controls = false;
+        audio.autoplay = true; // Add autoplay
         
         // Set up event listeners before setting source
         audio.oncanplay = async () => {
@@ -706,6 +722,7 @@ async function playAudioResponse(audioUrl, text) {
             try {
                 // For iOS, try to resume audio context before playing
                 if (audioContext && audioContext.state === 'suspended') {
+                    console.log('Resuming audio context before playback...');
                     await audioContext.resume();
                 }
                 
@@ -716,9 +733,11 @@ async function playAudioResponse(audioUrl, text) {
                     }).catch(async error => {
                         console.error('Error during audio playback:', error);
                         if (error.name === 'NotAllowedError') {
+                            console.log('NotAllowedError caught, attempting to reinitialize...');
                             // Try to reinitialize audio context
                             const reinitialized = await initializeAudioContext();
                             if (reinitialized) {
+                                console.log('Reinitialized successfully, retrying playback...');
                                 // Retry playback
                                 audio.play().catch(e => {
                                     console.error('Retry playback failed:', e);
@@ -726,10 +745,12 @@ async function playAudioResponse(audioUrl, text) {
                                     currentlyPlaying = false;
                                 });
                             } else {
+                                console.log('Reinitialization failed, queueing message...');
                                 pendingAudioMessages.push({ audioUrl, text });
                                 currentlyPlaying = false;
                             }
                         } else {
+                            console.error('Unexpected audio playback error:', error);
                             currentlyPlaying = false;
                         }
                     });
@@ -743,6 +764,14 @@ async function playAudioResponse(audioUrl, text) {
         audio.onended = () => {
             console.log('Audio playback completed');
             currentlyPlaying = false;
+            
+            // Clean up
+            if (currentAudioElement === audio) {
+                currentAudioElement.src = '';
+                currentAudioElement.load();
+                currentAudioElement = null;
+            }
+            
             socket.emit('audio-complete');
             
             // Keep audio enabled state and play next message if available
@@ -755,6 +784,13 @@ async function playAudioResponse(audioUrl, text) {
         audio.onerror = (e) => {
             console.error('Audio playback error:', e);
             currentlyPlaying = false;
+            
+            // Clean up on error
+            if (currentAudioElement === audio) {
+                currentAudioElement.src = '';
+                currentAudioElement.load();
+                currentAudioElement = null;
+            }
             
             if (audioEnabled && pendingAudioMessages.length > 0) {
                 const nextMessage = pendingAudioMessages.shift();
@@ -785,8 +821,10 @@ function addAudioEnableButton() {
     button.onclick = async () => {
         try {
             if (!audioEnabled) {
+                console.log('Attempting to enable audio...');
                 const success = await initializeAudioContext();
                 if (success) {
+                    console.log('Audio initialization successful');
                     audioEnabled = true;
                     localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
                     button.innerHTML = '🔊';
@@ -798,16 +836,22 @@ function addAudioEnableButton() {
                         const nextMessage = pendingAudioMessages.shift();
                         await playAudioResponse(nextMessage.audioUrl, nextMessage.text);
                     }
+                } else {
+                    console.error('Failed to initialize audio');
                 }
             } else {
+                console.log('Disabling audio...');
                 audioEnabled = false;
                 localStorage.setItem(AUDIO_ENABLED_KEY, 'false');
                 button.innerHTML = '🔇';
                 button.classList.add('disabled');
                 button.setAttribute('aria-label', 'Enable Audio');
+                
+                // Clean up current audio if any
                 if (currentAudioElement) {
                     currentAudioElement.pause();
                     currentAudioElement.src = '';
+                    currentAudioElement.load();
                     currentAudioElement = null;
                 }
                 currentlyPlaying = false;
