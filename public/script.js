@@ -39,9 +39,6 @@ let competitionInterval = null;
 document.addEventListener('DOMContentLoaded', () => {
     initializeMessageHandling();
     initializeCompetitionUI();
-    
-    // Add initial system message
-    addSystemMessage('Connected to Kaia\'s Talk Show! Send a message to participate.', 'success');
 });
 
 let messageQueue = [];
@@ -177,7 +174,7 @@ function updateCompetitionTimer() {
     }
 }
 
-// Handle competition start
+// Handle competition start without system message
 socket.on('competition-start', (data) => {
     competitionEndTime = data.endTime;
     
@@ -191,9 +188,6 @@ socket.on('competition-start', (data) => {
     }
     
     competitionInterval = setInterval(updateCompetitionTimer, 100);
-    
-    // Add competition announcement to messages
-    addSystemMessage('🎯 New competition round started! Submit your message to compete!', 'competition-start');
 });
 
 // Handle competition winner with debug logging
@@ -212,19 +206,20 @@ socket.on('competition-winner', (data) => {
     // Add winner announcement
     const winnerMessage = document.createElement('div');
     winnerMessage.className = 'message winner-message';
+    winnerMessage.dataset.messageId = data.timestamp; // Add unique identifier
     winnerMessage.innerHTML = `
         <div class="winner-banner">
             🏆 Winning Message!
             <div class="score">Score: ${Math.round(data.score * 10) / 10}</div>
         </div>
         <div class="message-content">
-            <strong>${data.userName}</strong>: ${data.message}
+            <strong>${data.userName || 'Anonymous'}</strong>: ${data.message || ''}
         </div>
         <div class="kaia-response">
             <div class="response-header">
                 <span class="ai-indicator">🎙️ Kaia's Response:</span>
             </div>
-            ${data.response}
+            ${data.response || ''}
         </div>
     `;
     
@@ -277,12 +272,13 @@ function initializeMessageHandling() {
         if (message) {
             console.log('Sending message:', message); // Debug log
             
+            const timestamp = Date.now();
             // Create message data object
             const messageData = {
                 message: message,
                 userName: name,
                 userId: localStorage.getItem('deviceId') || 'anonymous',
-                timestamp: Date.now()
+                timestamp: timestamp
             };
             
             // Add message to UI immediately
@@ -316,13 +312,23 @@ socket.on('new-message', (data) => {
 function addMessage(data, isUser = false) {
     if (!messagesContainer) return;
     
+    // Don't display duplicate messages
+    const existingMessages = messagesContainer.querySelectorAll('.message');
+    for (const msg of existingMessages) {
+        if (msg.dataset.messageId === data.timestamp) {
+            return; // Skip if message already exists
+        }
+    }
+    
     const messageElement = document.createElement('div');
     messageElement.className = `message ${isUser ? 'user-message' : ''} ${data.isCompeting ? 'competing-message' : ''}`;
+    messageElement.dataset.messageId = data.timestamp; // Add unique identifier
     
+    // Format the message content properly
     let content = `
         ${data.isCompeting ? '<div class="competing-badge">🎯 Competing</div>' : ''}
         <div class="message-content">
-            <strong>${data.userName}</strong>: ${data.message}
+            <strong>${data.userName || 'Anonymous'}</strong>: ${data.message || ''}
         </div>
         <div class="message-meta">
             <span class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</span>
@@ -344,23 +350,17 @@ function addSystemMessage(message, type = '') {
     systemMessage.scrollIntoView({ behavior: 'smooth' });
 }
 
-// Socket event handlers
+// Modify socket event handlers to remove unnecessary messages
 socket.on('connect', () => {
-    addSystemMessage('Connected to server', 'success');
+    console.log('Connected to server');
 });
 
 socket.on('disconnect', () => {
-    addSystemMessage('Disconnected from server. Attempting to reconnect...', 'error');
+    console.log('Disconnected from server');
 });
 
 socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
-    addSystemMessage('Connection error. Trying to reconnect...', 'error');
-});
-
-socket.on('error', (error) => {
-    console.error('Socket error:', error);
-    addSystemMessage(error.message, 'error');
 });
 
 // Message Handling
@@ -606,7 +606,7 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Add audio playback function
+// Add audio playback function with broadcast support
 function playAudioResponse(audioUrl, text) {
     if (!audioUrl) return;
     
@@ -622,7 +622,7 @@ function playAudioResponse(audioUrl, text) {
     
     // Update UI
     if (nowPlaying) {
-        nowPlaying.innerHTML = `🎙️ Now Playing: ${text}`;
+        nowPlaying.innerHTML = `🎙️ Now Playing: ${text || ''}`;
     }
     
     // Play audio with error handling
@@ -636,8 +636,10 @@ function playAudioResponse(audioUrl, text) {
     // Reset UI when audio ends
     currentAudioElement.onended = () => {
         if (nowPlaying) {
-            nowPlaying.innerHTML = 'Waiting for next winner...';
+            nowPlaying.innerHTML = '';
         }
+        // Notify server that audio playback is complete
+        socket.emit('audio-complete');
     };
 }
 
