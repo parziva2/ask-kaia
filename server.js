@@ -324,8 +324,12 @@ io.on('connection', (socket) => {
 
     socket.on('send-message', async (data) => {
         try {
+            console.log('Received message:', data);
+            
             if (!state.currentCompetition.isActive) {
-                socket.emit('message-error', { message: 'Please wait for the next competition round to start.' });
+                // Start a new competition if none is active
+                startCompetitionRound();
+                socket.emit('message-error', { message: 'Starting new competition round...' });
                 return;
             }
             
@@ -350,9 +354,11 @@ io.on('connection', (socket) => {
             });
             
             // Start competition if minimum messages reached
-            if (!state.currentCompetition.isActive && 
-                state.currentCompetition.messages.length >= MIN_MESSAGES_TO_START) {
-                startCompetitionRound();
+            if (state.currentCompetition.messages.length >= MIN_MESSAGES_TO_START) {
+                // Ensure competition is active
+                if (!state.currentCompetition.isActive) {
+                    startCompetitionRound();
+                }
             }
             
         } catch (error) {

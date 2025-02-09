@@ -287,6 +287,14 @@ function initializeMessageHandling() {
             messageInput.focus();
         }
     });
+
+    // Add keypress event listener for Enter key
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            messageForm.dispatchEvent(new Event('submit'));
+        }
+    });
 }
 
 // Add this new function to handle incoming messages
@@ -420,32 +428,6 @@ sphereCanvas.addEventListener('mousemove', (e) => {
     const rect = sphereCanvas.getBoundingClientRect();
     targetRotation.x = ((e.clientY - rect.top) / sphereCanvas.clientHeight - 0.5) * Math.PI;
     targetRotation.y = ((e.clientX - rect.left) / sphereCanvas.clientWidth - 0.5) * Math.PI;
-});
-
-sendButton.addEventListener('click', () => {
-    const message = messageInput.value.trim();
-    if (message) {
-        socket.emit('chat message', {
-            name: nameInput.value || 'User',
-            message: message
-        });
-        addMessage(message, true);
-        messageInput.value = '';
-    }
-});
-
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendButton.click();
-    }
-});
-
-// Socket Events
-socket.on('chat message', (data) => {
-    if (data.name !== (nameInput.value || 'User')) {
-        addMessage(data.message);
-    }
 });
 
 // Initialize
