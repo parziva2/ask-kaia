@@ -311,30 +311,6 @@ body {
     border: 1px solid rgba(255, 215, 0, 0.3);
 }
 
-.play-audio-button {
-    background: var(--primary-color);
-    color: var(--background-color);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 14px;
-    cursor: pointer;
-    margin-top: 12px;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.play-audio-button:hover {
-    transform: translateY(-1px);
-    opacity: 0.9;
-}
-
-.play-audio-button:active {
-    transform: translateY(1px);
-}
-
 /* Interaction Insights */
 .interaction-insights {
     display: grid;
@@ -466,24 +442,44 @@ body {
     color: var(--primary-color);
 }
 
-/* Fix iOS appearance */
-@supports (-webkit-touch-callout: none) {
-    body {
-        background-color: #000000;
-    }
-    
-    .app-container {
-        min-height: -webkit-fill-available;
-    }
-    
-    .top-nav {
-        background: rgba(0, 0, 0, 0.95);
-    }
+/* Remove old play button styles */
+.play-audio-button {
+    display: none;
+}
 
-    /* Add meta tag for iOS status bar */
-    head::before {
-        content: '<meta name="apple-mobile-web-app-status-bar-style" content="black">';
-    }
+/* Floating Audio Button */
+.floating-audio-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: var(--background-color);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0, 255, 149, 0.3);
+    transition: all 0.3s ease;
+}
+
+.floating-audio-button.disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.floating-audio-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(0, 255, 149, 0.4);
+}
+
+.floating-audio-button:active {
+    transform: scale(0.95);
 }
 
 /* Mobile-specific styles */
@@ -522,5 +518,37 @@ body {
     .stats {
         flex-direction: column;
         gap: 1rem;
+    }
+    
+    .floating-audio-button {
+        bottom: 15px;
+        right: 15px;
+        width: 45px;
+        height: 45px;
+        font-size: 20px;
+    }
+}
+
+/* Fix iOS appearance */
+@supports (-webkit-touch-callout: none) {
+    body {
+        background-color: #000000;
+    }
+    
+    .app-container {
+        min-height: -webkit-fill-available;
+    }
+    
+    .top-nav {
+        background: rgba(0, 0, 0, 0.95);
+    }
+
+    /* Add meta tag for iOS status bar */
+    head::before {
+        content: '<meta name="apple-mobile-web-app-status-bar-style" content="black">';
+    }
+    
+    .floating-audio-button {
+        bottom: 25px; /* Account for iOS safe area */
     }
 } 

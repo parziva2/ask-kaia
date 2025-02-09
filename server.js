@@ -86,6 +86,7 @@ const state = {
     lastMessageTime: Date.now(),
     conversationHistory: [],
     competedMessages: new Set(),
+    winningMessages: new Set(),
     currentCompetition: {
         messages: [],
         startTime: null,
@@ -354,7 +355,7 @@ function startCompetitionRound() {
 async function endCompetitionRound() {
     if (!state.currentCompetition.isActive) return;
     
-    const messages = state.currentCompetition.messages;
+    const messages = state.currentCompetition.messages.filter(msg => !state.winningMessages.has(msg.message));
     if (messages.length === 0) {
         state.currentCompetition.isActive = false;
         startCompetitionRound(); // Start new round if no messages
@@ -368,6 +369,12 @@ async function endCompetitionRound() {
     
     state.currentCompetition.winningMessage = winningMessage;
     state.currentCompetition.isActive = false;
+    state.winningMessages.add(winningMessage.message);
+    
+    // Clean up old winning messages (keep only last hour)
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    state.conversationHistory = state.conversationHistory.filter(msg => msg.timestamp > oneHourAgo);
+    state.winningMessages.clear();
     
     try {
         // Generate text response
@@ -424,11 +431,6 @@ async function endCompetitionRound() {
     } catch (error) {
         console.error('Error handling winning message:', error);
     }
-    
-    // Clean up competed messages older than 1 hour
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
-    state.conversationHistory = state.conversationHistory.filter(msg => msg.timestamp > oneHourAgo);
-    state.competedMessages.clear(); // Clear competed messages after each round
     
     // Start new round after a short delay
     setTimeout(startCompetitionRound, 5000);

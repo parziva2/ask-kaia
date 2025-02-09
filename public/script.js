@@ -38,10 +38,15 @@ let competitionInterval = null;
 // Track current audio state and processed responses
 let processedResponses = new Set(); // Track processed responses
 
+// Track audio state
+let audioEnabled = false;
+let pendingAudioMessages = [];
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     initializeMessageHandling();
     initializeCompetitionUI();
+    addAudioEnableButton();
 });
 
 let messageQueue = [];
@@ -244,14 +249,6 @@ socket.on('competition-winner', (data) => {
 
     // Play audio response if available
     if (data.audioUrl) {
-        // Add a play button for iOS
-        const playButton = document.createElement('button');
-        playButton.className = 'play-audio-button';
-        playButton.innerHTML = '▶️ Play Response';
-        playButton.onclick = () => playAudioResponse(data.audioUrl, data.response);
-        winnerMessage.querySelector('.kaia-response').appendChild(playButton);
-        
-        // Also try to play automatically
         playAudioResponse(data.audioUrl, data.response);
     }
 });
@@ -636,6 +633,14 @@ async function initializeAudioContext() {
         }
         
         audioInitialized = true;
+        audioEnabled = true;
+        
+        // Play any pending messages
+        while (pendingAudioMessages.length > 0) {
+            const msg = pendingAudioMessages.shift();
+            await playAudioResponse(msg.audioUrl, msg.text);
+        }
+        
         return true;
     } catch (error) {
         console.error('Error initializing audio context:', error);
@@ -643,18 +648,20 @@ async function initializeAudioContext() {
     }
 }
 
-// Initialize audio on first user interaction
-document.addEventListener('touchstart', initializeAudioContext, { once: true });
-document.addEventListener('click', initializeAudioContext, { once: true });
-
 // Enhanced audio playback function with better iOS support
 async function playAudioResponse(audioUrl, text) {
     if (!audioUrl) return;
     
+    if (!audioEnabled) {
+        pendingAudioMessages.push({ audioUrl, text });
+        return;
+    }
+    
     try {
         // Initialize audio context if needed
         if (!audioInitialized) {
-            await initializeAudioContext();
+            const initialized = await initializeAudioContext();
+            if (!initialized) return;
         }
         
         const audio = new Audio();
@@ -668,14 +675,7 @@ async function playAudioResponse(audioUrl, text) {
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
                     console.error('Error during audio playback:', error);
-                    // For iOS, try to play on next user interaction
-                    const playOnInteraction = () => {
-                        audio.play().catch(console.error);
-                        document.removeEventListener('touchstart', playOnInteraction);
-                        document.removeEventListener('click', playOnInteraction);
-                    };
-                    document.addEventListener('touchstart', playOnInteraction, { once: true });
-                    document.addEventListener('click', playOnInteraction, { once: true });
+                    audioEnabled = false; // Reset audio state on error
                 });
             }
         };
@@ -685,19 +685,31 @@ async function playAudioResponse(audioUrl, text) {
             socket.emit('audio-complete');
         };
         
-        audio.onerror = (e) => {
-            console.error('Audio error:', e);
-        };
-        
         // Set source and load
         const fullUrl = audioUrl.startsWith('http') ? audioUrl : window.location.origin + audioUrl;
-        console.log('Loading audio from URL:', fullUrl);
         audio.src = fullUrl;
         audio.load();
         
     } catch (error) {
         console.error('Error setting up audio playback:', error);
     }
+}
+
+// Add floating audio enable button for iOS
+function addAudioEnableButton() {
+    const button = document.createElement('button');
+    button.id = 'enable-audio-button';
+    button.innerHTML = '🔊';
+    button.className = 'floating-audio-button' + (!audioEnabled ? ' disabled' : '');
+    
+    button.onclick = async () => {
+        if (!audioEnabled) {
+            await initializeAudioContext();
+            button.classList.remove('disabled');
+        }
+    };
+    
+    document.body.appendChild(button);
 }
 
 // Handle audio completion
