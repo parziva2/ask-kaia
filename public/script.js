@@ -43,6 +43,10 @@ let audioEnabled = false;
 let pendingAudioMessages = [];
 let currentlyPlaying = false;
 
+// Add local storage for audio state persistence
+const AUDIO_ENABLED_KEY = 'audioEnabled';
+audioEnabled = localStorage.getItem(AUDIO_ENABLED_KEY) === 'true';
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     initializeMessageHandling();
@@ -651,7 +655,7 @@ async function initializeAudioContext() {
 
 // Enhanced audio playback function with better iOS support
 async function playAudioResponse(audioUrl, text) {
-    if (!audioUrl || currentlyPlaying) return;
+    if (!audioUrl) return;
     
     if (!audioEnabled) {
         console.log('Audio not enabled, queueing message');
@@ -667,6 +671,13 @@ async function playAudioResponse(audioUrl, text) {
                 console.log('Failed to initialize audio context');
                 return;
             }
+        }
+        
+        // Wait for previous audio to finish if any
+        if (currentlyPlaying) {
+            console.log('Audio already playing, queueing message');
+            pendingAudioMessages.push({ audioUrl, text });
+            return;
         }
         
         currentlyPlaying = true;
@@ -697,15 +708,9 @@ async function playAudioResponse(audioUrl, text) {
                     console.error('Error during audio playback:', error);
                     // On iOS, we need user interaction
                     if (error.name === 'NotAllowedError') {
-                        audioEnabled = false;
-                        const button = document.getElementById('enable-audio-button');
-                        if (button) {
-                            button.innerHTML = '🔇';
-                            button.classList.add('disabled');
-                        }
                         pendingAudioMessages.push({ audioUrl, text });
+                        currentlyPlaying = false;
                     }
-                    currentlyPlaying = false;
                 });
             }
         };
@@ -715,8 +720,8 @@ async function playAudioResponse(audioUrl, text) {
             currentlyPlaying = false;
             socket.emit('audio-complete');
             
-            // Play next pending message if any
-            if (pendingAudioMessages.length > 0 && audioEnabled) {
+            // Keep audio enabled state
+            if (audioEnabled && pendingAudioMessages.length > 0) {
                 const nextMessage = pendingAudioMessages.shift();
                 playAudioResponse(nextMessage.audioUrl, nextMessage.text);
             }
@@ -726,8 +731,8 @@ async function playAudioResponse(audioUrl, text) {
             console.error('Audio playback error:', e);
             currentlyPlaying = false;
             
-            // Try to recover by playing next message
-            if (pendingAudioMessages.length > 0 && audioEnabled) {
+            // Try to recover by playing next message if audio is still enabled
+            if (audioEnabled && pendingAudioMessages.length > 0) {
                 const nextMessage = pendingAudioMessages.shift();
                 playAudioResponse(nextMessage.audioUrl, nextMessage.text);
             }
@@ -764,6 +769,7 @@ function addAudioEnableButton() {
                 const success = await initializeAudioContext();
                 if (success) {
                     audioEnabled = true;
+                    localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
                     button.innerHTML = '🔊';
                     button.classList.remove('disabled');
                     button.setAttribute('aria-label', 'Mute Audio');
@@ -776,6 +782,7 @@ function addAudioEnableButton() {
                 }
             } else {
                 audioEnabled = false;
+                localStorage.setItem(AUDIO_ENABLED_KEY, 'false');
                 button.innerHTML = '🔇';
                 button.classList.add('disabled');
                 button.setAttribute('aria-label', 'Enable Audio');
@@ -784,6 +791,7 @@ function addAudioEnableButton() {
                     currentAudioElement.src = '';
                     currentAudioElement = null;
                 }
+                currentlyPlaying = false;
             }
         } catch (error) {
             console.error('Error toggling audio:', error);
