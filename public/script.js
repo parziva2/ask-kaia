@@ -644,10 +644,11 @@ function initializeAudio() {
 // Function to initialize audio context
 async function initializeAudioContext() {
     try {
-        if (audioInitialized) return true;
-
+        console.log('Initializing audio context...');
         const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!audioContext) {
+        
+        // Create new context if it doesn't exist or is closed
+        if (!audioContext || audioContext.state === 'closed') {
             audioContext = new AudioContext();
             console.log('Created new AudioContext, state:', audioContext.state);
         }
@@ -668,10 +669,14 @@ async function initializeAudioContext() {
         source.stop(0.001); // Extremely short duration
 
         // Try to play a silent audio file (important for iOS)
-        try {
-            await responseAudio.play();
-        } catch (e) {
-            console.log('Silent audio play failed (expected):', e);
+        if (responseAudio) {
+            responseAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+            try {
+                await responseAudio.play();
+                responseAudio.pause();
+            } catch (e) {
+                console.log('Silent audio play failed (expected):', e);
+            }
         }
         
         audioInitialized = true;
@@ -809,6 +814,13 @@ function addAudioEnableButton() {
         try {
             if (!audioEnabled) {
                 console.log('Attempting to enable audio...');
+                // Close existing context if it exists
+                if (audioContext) {
+                    await audioContext.close();
+                    audioContext = null;
+                }
+                audioInitialized = false;
+                
                 const success = await initializeAudioContext();
                 if (success) {
                     console.log('Audio initialization successful');
@@ -839,6 +851,11 @@ function addAudioEnableButton() {
                     responseAudio.pause();
                     responseAudio.currentTime = 0;
                 }
+                if (audioContext) {
+                    await audioContext.close();
+                    audioContext = null;
+                }
+                audioInitialized = false;
                 currentlyPlaying = false;
                 // Clear pending messages when audio is disabled
                 pendingAudioMessages = [];
