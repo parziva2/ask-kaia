@@ -17,8 +17,8 @@ body {
     margin: 0;
     padding: 0;
     min-height: 100vh;
-    background: linear-gradient(135deg, #1a1a1a, #2d1f3d);
-    color: #fff;
+    background-color: var(--background-color);
+    color: var(--text-color);
     -webkit-tap-highlight-color: transparent;
     font-family: 'Inter', sans-serif;
     line-height: 1.6;
@@ -449,12 +449,11 @@ body {
     left: 0;
     right: 0;
     z-index: 1000;
-    background: rgba(10, 10, 10, 0.95);
+    background: transparent;
     padding: 12px;
     text-align: center;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .now-playing {
@@ -500,7 +499,7 @@ body {
 /* Fix iOS appearance */
 @supports (-webkit-touch-callout: none) {
     body {
-        background-attachment: fixed;
+        background-color: #000000;
     }
     
     .app-container {
@@ -508,7 +507,12 @@ body {
     }
     
     .top-nav {
-        background: rgba(10, 10, 10, 0.95);
+        background: rgba(0, 0, 0, 0.95);
+    }
+
+    /* Add meta tag for iOS status bar */
+    head::before {
+        content: '<meta name="apple-mobile-web-app-status-bar-style" content="black">';
     }
 }
 
