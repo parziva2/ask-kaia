@@ -358,6 +358,7 @@ async function endCompetitionRound() {
     const messages = state.currentCompetition.messages.filter(msg => !state.winningMessages.has(msg.message));
     if (messages.length === 0) {
         state.currentCompetition.isActive = false;
+        state.currentCompetition.messages = []; // Clear messages if none are eligible
         startCompetitionRound(); // Start new round if no messages
         return;
     }
@@ -369,12 +370,7 @@ async function endCompetitionRound() {
     
     state.currentCompetition.winningMessage = winningMessage;
     state.currentCompetition.isActive = false;
-    state.winningMessages.add(winningMessage.message);
-    
-    // Clean up old winning messages (keep only last hour)
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
-    state.conversationHistory = state.conversationHistory.filter(msg => msg.timestamp > oneHourAgo);
-    state.winningMessages.clear();
+    state.winningMessages.add(winningMessage.message); // Add to winning messages set
     
     try {
         // Generate text response
@@ -403,12 +399,6 @@ async function endCompetitionRound() {
                 console.log('Broadcasting winner to all clients:', winnerData);
                 io.emit('competition-winner', winnerData);
                 
-                // Explicitly send audio play command to all clients
-                io.emit('play-audio', {
-                    audioPath: audioUrl,
-                    text: response
-                });
-                
                 // Add to conversation history
                 state.conversationHistory.push({
                     ...winningMessage,
@@ -431,6 +421,9 @@ async function endCompetitionRound() {
     } catch (error) {
         console.error('Error handling winning message:', error);
     }
+    
+    // Clear current competition messages
+    state.currentCompetition.messages = [];
     
     // Start new round after a short delay
     setTimeout(startCompetitionRound, 5000);

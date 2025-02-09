@@ -452,30 +452,34 @@ body {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: var(--primary-color);
-    color: var(--background-color);
-    border: none;
-    font-size: 24px;
+    background: rgba(0, 0, 0, 0.8);
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+    font-size: 20px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    box-shadow: 0 2px 10px rgba(0, 255, 149, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     transition: all 0.3s ease;
+    padding: 0;
+    line-height: 1;
 }
 
 .floating-audio-button.disabled {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.5);
 }
 
 .floating-audio-button:hover {
     transform: scale(1.1);
-    box-shadow: 0 4px 15px rgba(0, 255, 149, 0.4);
+    background: rgba(0, 0, 0, 0.9);
 }
 
 .floating-audio-button:active {
@@ -523,9 +527,9 @@ body {
     .floating-audio-button {
         bottom: 15px;
         right: 15px;
-        width: 45px;
-        height: 45px;
-        font-size: 20px;
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
     }
 }
 
@@ -549,6 +553,7 @@ body {
     }
     
     .floating-audio-button {
-        bottom: 25px; /* Account for iOS safe area */
+        bottom: env(safe-area-inset-bottom, 20px);
+        right: env(safe-area-inset-right, 20px);
     }
 } 

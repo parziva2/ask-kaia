@@ -41,6 +41,7 @@ let processedResponses = new Set(); // Track processed responses
 // Track audio state
 let audioEnabled = false;
 let pendingAudioMessages = [];
+let currentlyPlaying = false;
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -248,7 +249,7 @@ socket.on('competition-winner', (data) => {
     }
 
     // Play audio response if available
-    if (data.audioUrl) {
+    if (data.audioUrl && !currentlyPlaying) {
         playAudioResponse(data.audioUrl, data.response);
     }
 });
@@ -650,7 +651,7 @@ async function initializeAudioContext() {
 
 // Enhanced audio playback function with better iOS support
 async function playAudioResponse(audioUrl, text) {
-    if (!audioUrl) return;
+    if (!audioUrl || currentlyPlaying) return;
     
     if (!audioEnabled) {
         pendingAudioMessages.push({ audioUrl, text });
@@ -664,7 +665,15 @@ async function playAudioResponse(audioUrl, text) {
             if (!initialized) return;
         }
         
+        currentlyPlaying = true;
+        
+        if (currentAudioElement) {
+            currentAudioElement.pause();
+            currentAudioElement = null;
+        }
+        
         const audio = new Audio();
+        currentAudioElement = audio;
         audio.preload = 'auto';
         
         // Set up event listeners before setting source
@@ -675,14 +684,32 @@ async function playAudioResponse(audioUrl, text) {
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
                     console.error('Error during audio playback:', error);
-                    audioEnabled = false; // Reset audio state on error
+                    audioEnabled = false;
+                    const button = document.getElementById('enable-audio-button');
+                    if (button) {
+                        button.innerHTML = '🔇';
+                        button.classList.add('disabled');
+                    }
+                    currentlyPlaying = false;
                 });
             }
         };
         
         audio.onended = () => {
             console.log('Audio playback completed');
+            currentlyPlaying = false;
             socket.emit('audio-complete');
+            
+            // Play next pending message if any
+            if (pendingAudioMessages.length > 0 && audioEnabled) {
+                const nextMessage = pendingAudioMessages.shift();
+                playAudioResponse(nextMessage.audioUrl, nextMessage.text);
+            }
+        };
+        
+        audio.onerror = () => {
+            console.error('Audio playback error');
+            currentlyPlaying = false;
         };
         
         // Set source and load
@@ -692,6 +719,7 @@ async function playAudioResponse(audioUrl, text) {
         
     } catch (error) {
         console.error('Error setting up audio playback:', error);
+        currentlyPlaying = false;
     }
 }
 
@@ -699,13 +727,28 @@ async function playAudioResponse(audioUrl, text) {
 function addAudioEnableButton() {
     const button = document.createElement('button');
     button.id = 'enable-audio-button';
-    button.innerHTML = '🔊';
+    button.innerHTML = audioEnabled ? '🔊' : '🔇';
     button.className = 'floating-audio-button' + (!audioEnabled ? ' disabled' : '');
+    button.setAttribute('aria-label', audioEnabled ? 'Mute Audio' : 'Enable Audio');
     
     button.onclick = async () => {
         if (!audioEnabled) {
-            await initializeAudioContext();
-            button.classList.remove('disabled');
+            const success = await initializeAudioContext();
+            if (success) {
+                audioEnabled = true;
+                button.innerHTML = '🔊';
+                button.classList.remove('disabled');
+                button.setAttribute('aria-label', 'Mute Audio');
+            }
+        } else {
+            audioEnabled = false;
+            button.innerHTML = '🔇';
+            button.classList.add('disabled');
+            button.setAttribute('aria-label', 'Enable Audio');
+            if (currentAudioElement) {
+                currentAudioElement.pause();
+                currentAudioElement = null;
+            }
         }
     };
     
