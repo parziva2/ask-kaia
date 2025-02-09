@@ -819,30 +819,48 @@ function addAudioEnableButton() {
     button.setAttribute('aria-label', audioEnabled ? 'Mute Audio' : 'Enable Audio');
     
     // Add touch feedback styles
-    button.style.transition = 'transform 0.1s ease-in-out, opacity 0.2s ease-in-out';
+    button.style.cssText = `
+        transition: transform 0.1s ease-in-out, opacity 0.2s ease-in-out;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    `;
     
-    // Prevent default touch behavior
+    // Prevent default touch behavior and add visual feedback
     button.addEventListener('touchstart', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         button.style.transform = 'scale(0.95)';
     }, { passive: false });
     
     button.addEventListener('touchend', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         button.style.transform = 'scale(1)';
     }, { passive: false });
     
-    // Debounce the click/touch handler
+    // Debounce and improve click/touch handler
     let isHandlingClick = false;
+    let clickTimeout;
+    
     const handleClick = async (e) => {
         e.preventDefault();
-        if (isHandlingClick) return;
-        isHandlingClick = true;
+        e.stopPropagation();
+        
+        // Prevent multiple rapid clicks
+        if (isHandlingClick) {
+            console.log('Already handling click, ignoring');
+            return;
+        }
         
         try {
+            isHandlingClick = true;
+            button.disabled = true;
+            
+            // Add visual feedback
+            button.classList.add('processing');
+            
             if (!audioEnabled) {
                 console.log('Attempting to enable audio...');
-                button.disabled = true; // Prevent multiple clicks
                 
                 // Close existing context if it exists
                 if (audioContext) {
@@ -858,9 +876,11 @@ function addAudioEnableButton() {
                 // Try to initialize audio multiple times if needed
                 let success = false;
                 for (let i = 0; i < 3 && !success; i++) {
-                    if (i > 0) console.log(`Retry attempt ${i + 1}...`);
+                    if (i > 0) {
+                        console.log(`Retry attempt ${i + 1}...`);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
                     success = await initializeAudioContext();
-                    if (!success) await new Promise(resolve => setTimeout(resolve, 100));
                 }
                 
                 if (success) {
@@ -878,9 +898,14 @@ function addAudioEnableButton() {
                     }
                 } else {
                     console.error('Failed to initialize audio after multiple attempts');
-                    // Show feedback to user
                     button.classList.add('error');
                     setTimeout(() => button.classList.remove('error'), 2000);
+                    
+                    // Reset to disabled state
+                    audioEnabled = false;
+                    localStorage.setItem(AUDIO_ENABLED_KEY, 'false');
+                    button.innerHTML = '🔇';
+                    button.classList.add('disabled');
                 }
             } else {
                 console.log('Disabling audio...');
@@ -905,32 +930,81 @@ function addAudioEnableButton() {
                 }
                 audioInitialized = false;
                 currentlyPlaying = false;
-                // Clear pending messages when audio is disabled
                 pendingAudioMessages = [];
             }
         } catch (error) {
             console.error('Error toggling audio:', error);
-            // Show error feedback
             button.classList.add('error');
             setTimeout(() => button.classList.remove('error'), 2000);
+            
+            // Reset to previous state on error
+            button.innerHTML = audioEnabled ? '🔊' : '🔇';
+            button.classList.toggle('disabled', !audioEnabled);
         } finally {
+            button.classList.remove('processing');
             button.disabled = false;
-            isHandlingClick = false;
+            
+            // Reset handling state after a delay
+            clearTimeout(clickTimeout);
+            clickTimeout = setTimeout(() => {
+                isHandlingClick = false;
+            }, 500); // Prevent rapid clicks for 500ms
         }
     };
     
-    // Add both click and touch handlers
-    button.addEventListener('click', handleClick);
-    button.addEventListener('touchend', handleClick);
+    // Add both click and touch handlers with improved touch handling
+    button.addEventListener('click', handleClick, { passive: false });
+    button.addEventListener('touchend', handleClick, { passive: false });
     
     document.body.appendChild(button);
     
-    // Add error state styles
-    const errorStyle = document.createElement('style');
-    errorStyle.textContent = `
+    // Add enhanced styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .floating-audio-button {
+            position: fixed;
+            bottom: max(20px, env(safe-area-inset-bottom, 20px));
+            right: max(20px, env(safe-area-inset-right, 20px));
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.8);
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 0;
+            line-height: 1;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .floating-audio-button.disabled {
+            color: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        .floating-audio-button.processing {
+            opacity: 0.7;
+            animation: pulse 1s infinite;
+        }
+        
         .floating-audio-button.error {
             animation: shake 0.5s ease-in-out;
             border-color: #ff3366;
+        }
+        
+        .floating-audio-button:disabled {
+            pointer-events: none;
         }
         
         @keyframes shake {
@@ -939,12 +1013,20 @@ function addAudioEnableButton() {
             75% { transform: translateX(5px); }
         }
         
-        .floating-audio-button:disabled {
-            opacity: 0.7;
-            pointer-events: none;
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        
+        @media (hover: hover) {
+            .floating-audio-button:hover {
+                transform: scale(1.1);
+                background: rgba(0, 0, 0, 0.9);
+            }
         }
     `;
-    document.head.appendChild(errorStyle);
+    document.head.appendChild(style);
 }
 
 // Handle audio completion
