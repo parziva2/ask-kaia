@@ -145,7 +145,7 @@ function scoreMessage(message, userId) {
     return score;
 }
 
-// Generate audio from text
+// Generate audio from text with improved error handling
 async function generateAudio(text, userId) {
     try {
         console.log('Generating audio for text:', text);
@@ -153,22 +153,21 @@ async function generateAudio(text, userId) {
             input: { text },
             voice: {
                 languageCode: 'en-US',
-                name: 'en-US-Studio-O',  // Using a different voice
+                name: 'en-US-Studio-O',
                 ssmlGender: 'FEMALE'
             },
             audioConfig: {
                 audioEncoding: 'MP3',
                 pitch: 0,
                 speakingRate: 1.0,
-                volumeGainDb: 3.0,  // Increased volume
-                effectsProfileId: ['headphone-class-device']  // Changed profile for better audio
+                volumeGainDb: 3.0,
+                effectsProfileId: ['headphone-class-device']
             },
         };
 
         console.log('Sending TTS request...');
         const [response] = await ttsClient.synthesizeSpeech(request);
-        console.log('Received TTS response');
-
+        
         if (!response || !response.audioContent) {
             console.error('No audio content in response');
             throw new Error('No audio content received from TTS service');
@@ -191,8 +190,8 @@ async function generateAudio(text, userId) {
         
         return audioUrl;
     } catch (error) {
-        console.error('Error generating audio:', error);
-        throw error;  // Re-throw to handle in calling function
+        console.error('Error in generateAudio:', error);
+        throw error;
     }
 }
 
@@ -358,43 +357,54 @@ async function endCompetitionRound() {
     state.currentCompetition.winningMessage = winningMessage;
     state.currentCompetition.isActive = false;
     
-    // Generate and send response
     try {
+        // Generate text response
         const response = await generateResponse(winningMessage.message, winningMessage.userName, true);
         
         if (response) {
-            // Generate audio first
+            console.log('Generated text response:', response);
+            
+            // Generate audio response
             let audioUrl = null;
             try {
-                audioUrl = await generateAudio(response, 'kaia');
+                console.log('Generating audio for response...');
+                audioUrl = await generateAudio(response, winningMessage.userId);
                 console.log('Generated audio URL:', audioUrl);
-            } catch (error) {
-                console.error('Error generating audio:', error);
-            }
-            
-            // Broadcast winner with audio URL
-            io.emit('competition-winner', {
-                userName: winningMessage.userName,
-                message: winningMessage.message,
-                response: response,
-                score: winningMessage.score,
-                audioUrl: audioUrl
-            });
-            
-            // If audio was generated, broadcast play command
-            if (audioUrl) {
+                
+                // Broadcast winner with audio URL
+                io.emit('competition-winner', {
+                    userName: winningMessage.userName,
+                    message: winningMessage.message,
+                    response: response,
+                    score: winningMessage.score,
+                    audioUrl: audioUrl,
+                    timestamp: Date.now()
+                });
+                
+                // Explicitly send audio play command
                 io.emit('play-audio', {
                     audioPath: audioUrl,
                     text: response
                 });
+                
+                // Add to conversation history
+                state.conversationHistory.push({
+                    ...winningMessage,
+                    response,
+                    audioUrl,
+                    timestamp: Date.now()
+                });
+            } catch (error) {
+                console.error('Error generating audio:', error);
+                // Still emit the winner even if audio fails
+                io.emit('competition-winner', {
+                    userName: winningMessage.userName,
+                    message: winningMessage.message,
+                    response: response,
+                    score: winningMessage.score,
+                    timestamp: Date.now()
+                });
             }
-            
-            // Add to conversation history
-            state.conversationHistory.push({
-                ...winningMessage,
-                response,
-                audioUrl
-            });
         }
     } catch (error) {
         console.error('Error handling winning message:', error);
