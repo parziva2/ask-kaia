@@ -237,14 +237,42 @@ body {
     padding: 1rem;
     border-radius: 0.5rem;
     animation: fadeIn 0.3s ease;
+    position: relative;
+}
+
+.message-content {
+    margin-bottom: 0.5rem;
+}
+
+.message-content strong {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.message-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.timestamp {
+    color: var(--text-color);
+}
+
+.score {
+    color: var(--primary-color);
+    font-weight: 500;
 }
 
 .user-message {
     border-left: 3px solid var(--primary-color);
 }
 
-.ai-message {
+.competing-message {
     border-left: 3px solid var(--secondary-color);
+    background: rgba(255, 51, 102, 0.05);
 }
 
 .competing-badge {

@@ -258,17 +258,26 @@ function initializeMessageHandling() {
         const name = nameInput.value.trim() || 'Anonymous';
         
         if (message) {
-            const messageId = Date.now().toString();
+            // Create message data object
             const messageData = {
                 message: message,
-                userId: localStorage.getItem('userId') || 'user-' + messageId,
                 userName: name,
-                messageId: messageId,
+                userId: localStorage.getItem('deviceId') || 'anonymous',
                 timestamp: Date.now()
             };
             
-            // Add user message to the feed
-            addMessage(messageData, true);
+            // Add message to UI immediately
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message user-message';
+            messageElement.innerHTML = `
+                <div class="message-content">
+                    <strong>${messageData.userName}</strong>: ${messageData.message}
+                </div>
+                <div class="message-meta">
+                    <span class="timestamp">${new Date(messageData.timestamp).toLocaleTimeString()}</span>
+                </div>
+            `;
+            messagesContainer.prepend(messageElement);
             
             // Send message to server
             socket.emit('send-message', messageData);
@@ -280,34 +289,26 @@ function initializeMessageHandling() {
     });
 }
 
-// Add a message to the feed
-function addMessage(data, isUser = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+// Add this new function to handle incoming messages
+socket.on('new-message', (data) => {
+    const messageElement = document.createElement('div');
+    messageElement.className = `message ${data.isCompeting ? 'competing-message' : 'user-message'}`;
     
-    if (data.isCompeting) {
-        messageDiv.innerHTML = `
-            <div class="competing-badge">🎯 Competing</div>
-            <div class="message-content">
-                <strong>${data.userName}</strong>: ${data.message}
-            </div>
-            ${data.score ? `
-                <div class="message-score">
-                    Score: ${Math.round(data.score * 10) / 10}
-                </div>
-            ` : ''}
-        `;
-    } else {
-        messageDiv.innerHTML = `
-            <div class="message-content">
-                <strong>${data.userName}</strong>: ${data.message}
-            </div>
-        `;
-    }
+    let content = `
+        ${data.isCompeting ? '<div class="competing-badge">🎯 Competing</div>' : ''}
+        <div class="message-content">
+            <strong>${data.userName}</strong>: ${data.message}
+        </div>
+        <div class="message-meta">
+            <span class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</span>
+            ${data.score ? `<span class="score">Score: ${Math.round(data.score * 10) / 10}</span>` : ''}
+        </div>
+    `;
     
-    messagesContainer.prepend(messageDiv);
-    messageDiv.scrollIntoView({ behavior: 'smooth' });
-}
+    messageElement.innerHTML = content;
+    messagesContainer.prepend(messageElement);
+    messageElement.scrollIntoView({ behavior: 'smooth' });
+});
 
 // Add a system message
 function addSystemMessage(message, type = '') {
