@@ -2,9 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Join Kaia's interactive AI talk show! Compete to have your messages featured and responded to live.">
     <meta name="keywords" content="AI, chat, competition, interactive, talk show, Kaia">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Ask Kaia - Interactive AI Talk Show</title>
     
     <!-- Favicon -->
@@ -112,6 +114,14 @@
                 </p>
             </div>
         </footer>
+    </div>
+
+    <div id="audio-container">
+        <audio id="response-audio" playsinline preload="auto"></audio>
+        <div id="now-playing" class="now-playing"></div>
+    </div>
+    <div class="audio-controls">
+        <button id="enable-audio" style="display: none;">Enable Audio</button>
     </div>
 
     <script src="script.js"></script>
