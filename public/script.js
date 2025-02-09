@@ -295,60 +295,124 @@ socket.on('message-error', (data) => {
 
 // Initialize message handling
 function initializeMessageHandling() {
-    const messageForm = document.getElementById('message-form');
-    const messageInput = document.getElementById('message-input');
-    const nameInput = document.getElementById('name-input');
-    
-    if (!messageForm || !messageInput || !nameInput) {
-        console.error('Required form elements not found!');
-        return;
-    }
-    
-    messageForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+    // Handle new messages
+    socket.on('new-message', (data) => {
+        console.log('Received new message:', data);
+        addMessage(data, data.userId === localStorage.getItem('deviceId'));
+    });
+
+    // Handle competition winner
+    socket.on('competition-winner', (data) => {
+        console.log('Received competition winner:', data);
         
-        const message = messageInput.value.trim();
-        const name = nameInput.value.trim() || 'Anonymous';
+        // Generate a unique response ID
+        const responseId = `${data.message}-${data.timestamp}`;
         
-        if (message) {
-            const timestamp = Date.now();
-            // Create message data object
-            const messageData = {
-                message: message,
-                userName: name,
-                userId: localStorage.getItem('deviceId') || 'anonymous',
-                timestamp: timestamp
-            };
-            
-            // Add message to UI immediately
-            addMessage(messageData, true);
-            
-            // Send message to server
-            socket.emit('send-message', messageData);
-            
-            // Clear input
-            messageInput.value = '';
-            messageInput.focus();
+        // Don't process if this response was already handled
+        if (processedResponses.has(responseId)) {
+            console.log('Skipping duplicate response:', responseId);
+            return;
+        }
+        
+        // Add to processed responses
+        processedResponses.add(responseId);
+        
+        competitionEndTime = null;
+        if (competitionInterval) {
+            clearInterval(competitionInterval);
+        }
+        
+        if (competitionStatus) {
+            competitionStatus.textContent = 'Winner selected! Next round starting soon...';
+            competitionStatus.className = 'status-waiting';
+        }
+        
+        // Add winner announcement to messages container
+        const winnerMessage = document.createElement('div');
+        winnerMessage.className = 'message winner-message';
+        winnerMessage.dataset.messageId = String(data.timestamp);
+        winnerMessage.dataset.responseId = responseId;
+        winnerMessage.innerHTML = `
+            <div class="winner-banner">
+                🏆 Winning Message!
+                <div class="score">Score: ${Math.round(data.score * 10) / 10}</div>
+            </div>
+            <div class="message-content">
+                <strong>${data.userName || 'Anonymous'}</strong>: ${data.message}
+            </div>
+            <div class="kaia-response">
+                <div class="response-header">
+                    <span class="ai-indicator">🎙️ Kaia's Response:</span>
+                </div>
+                ${data.response}
+            </div>
+        `;
+        
+        if (messagesContainer) {
+            messagesContainer.prepend(winnerMessage);
+            winnerMessage.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Play audio response if available
+        if (data.audioUrl && !processedResponses.has(data.audioUrl)) {
+            processedResponses.add(data.audioUrl);
+            playAudioResponse(data.audioUrl, data.response);
         }
     });
 
-    // Add keypress event listener for Enter key
-    messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            messageForm.dispatchEvent(new Event('submit'));
+    // Handle audio playback command
+    socket.on('play-audio', (data) => {
+        console.log('Received audio playback command:', data);
+        if (data.audioPath && !processedResponses.has(data.audioPath)) {
+            processedResponses.add(data.audioPath);
+            playAudioResponse(data.audioPath, data.text);
         }
     });
+
+    // Handle audio playback completion
+    socket.on('audio-playback-complete', (data) => {
+        console.log('Audio playback completed:', data);
+        if (nowPlaying) {
+            nowPlaying.innerHTML = '';
+        }
+    });
+
+    // Handle form submission
+    const messageForm = document.getElementById('message-form');
+    if (messageForm) {
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const name = nameInput.value.trim();
+            const message = messageInput.value.trim();
+            
+            if (name && message) {
+                const messageData = {
+                    userName: name,
+                    message: message,
+                    userId: localStorage.getItem('deviceId') || generateDeviceId(),
+                    timestamp: Date.now()
+                };
+                
+                socket.emit('send-message', messageData);
+                messageInput.value = '';
+                
+                // Save name in localStorage
+                localStorage.setItem('userName', name);
+            }
+        });
+    }
 }
 
-// Handle incoming messages with debug logging
-socket.on('new-message', (data) => {
-    console.log('Received new message:', data);  // Debug log
-    // Only add the message if it's not from the current user
-    if (data.userId !== localStorage.getItem('deviceId')) {
-        addMessage(data);
+// Generate a unique device ID if not exists
+function generateDeviceId() {
+    let deviceId = localStorage.getItem('deviceId');
+    if (!deviceId) {
+        deviceId = 'device_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('deviceId', deviceId);
     }
-});
+    return deviceId;
+}
 
 // Add message to UI
 function addMessage(data, isUser = false) {

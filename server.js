@@ -279,6 +279,8 @@ io.on('connection', (socket) => {
 
     socket.on('audio-complete', () => {
         console.log('Received audio completion signal from:', socket.id);
+        // Broadcast audio completion to all clients
+        io.emit('audio-playback-complete', { timestamp: Date.now() });
     });
 
     socket.on('disconnect', (reason) => {
@@ -288,7 +290,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Add new function to process messages
+// Add new function to process messages with improved broadcasting
 async function processNewMessage(data, socket) {
     if (state.currentCompetition.messages.length >= MAX_MESSAGES_PER_COMPETITION) {
         socket.emit('message-error', { message: 'This round is full. Please wait for the next round.' });
@@ -338,7 +340,7 @@ function startCompetitionRound() {
     setTimeout(endCompetitionRound, COMPETITION_DURATION);
 }
 
-// End current competition round
+// End current competition round with improved broadcasting
 async function endCompetitionRound() {
     if (!state.currentCompetition.isActive) return;
     
@@ -371,17 +373,20 @@ async function endCompetitionRound() {
                 audioUrl = await generateAudio(response, winningMessage.userId);
                 console.log('Generated audio URL:', audioUrl);
                 
-                // Broadcast winner with audio URL
-                io.emit('competition-winner', {
+                // Broadcast winner with audio URL to all clients
+                const winnerData = {
                     userName: winningMessage.userName,
                     message: winningMessage.message,
                     response: response,
                     score: winningMessage.score,
                     audioUrl: audioUrl,
                     timestamp: Date.now()
-                });
+                };
                 
-                // Explicitly send audio play command
+                console.log('Broadcasting winner to all clients:', winnerData);
+                io.emit('competition-winner', winnerData);
+                
+                // Explicitly send audio play command to all clients
                 io.emit('play-audio', {
                     audioPath: audioUrl,
                     text: response
