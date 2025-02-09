@@ -442,60 +442,6 @@ body {
     color: var(--primary-color);
 }
 
-/* Audio Controls */
-#audio-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    background: transparent;
-    padding: 12px;
-    text-align: center;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-}
-
-.now-playing {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.9);
-    margin: 5px 0;
-    min-height: 20px;
-}
-
-.audio-controls {
-    position: fixed;
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1001;
-    width: auto;
-    text-align: center;
-}
-
-#enable-audio {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 10px 20px;
-    border-radius: 24px;
-    font-size: 15px;
-    cursor: pointer;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-#enable-audio:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-1px);
-}
-
-#enable-audio:active {
-    transform: translateY(1px);
-}
-
 /* Fix iOS appearance */
 @supports (-webkit-touch-callout: none) {
     body {
@@ -552,23 +498,5 @@ body {
     .stats {
         flex-direction: column;
         gap: 1rem;
-    }
-    
-    #audio-container {
-        bottom: 60px;
-        padding: 8px;
-    }
-    
-    .now-playing {
-        font-size: 12px;
-    }
-    
-    .audio-controls {
-        bottom: 110px;
-    }
-    
-    #enable-audio {
-        padding: 6px 12px;
-        font-size: 12px;
     }
 } 
