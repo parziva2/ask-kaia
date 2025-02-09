@@ -85,6 +85,7 @@ const state = {
     activeListeners: new Set(),
     lastMessageTime: Date.now(),
     conversationHistory: [],
+    competedMessages: new Set(),
     currentCompetition: {
         messages: [],
         startTime: null,
@@ -292,6 +293,12 @@ io.on('connection', (socket) => {
 
 // Add new function to process messages with improved broadcasting
 async function processNewMessage(data, socket) {
+    // Check if message has already competed
+    if (state.competedMessages.has(data.message)) {
+        socket.emit('message-error', { message: 'This message has already competed in a round.' });
+        return;
+    }
+
     if (state.currentCompetition.messages.length >= MAX_MESSAGES_PER_COMPETITION) {
         socket.emit('message-error', { message: 'This round is full. Please wait for the next round.' });
         return;
@@ -307,6 +314,9 @@ async function processNewMessage(data, socket) {
     
     // Add to competition messages
     state.currentCompetition.messages.push(messageData);
+    
+    // Add to competed messages set
+    state.competedMessages.add(data.message);
     
     // Broadcast the message to all clients
     console.log('Broadcasting message to all clients:', messageData);
@@ -414,6 +424,11 @@ async function endCompetitionRound() {
     } catch (error) {
         console.error('Error handling winning message:', error);
     }
+    
+    // Clean up competed messages older than 1 hour
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    state.conversationHistory = state.conversationHistory.filter(msg => msg.timestamp > oneHourAgo);
+    state.competedMessages.clear(); // Clear competed messages after each round
     
     // Start new round after a short delay
     setTimeout(startCompetitionRound, 5000);

@@ -200,11 +200,11 @@ socket.on('listener-count', (count) => {
     }
 });
 
-// Handle competition winner with debug logging and duplicate prevention
+// Handle competition winner with audio
 socket.on('competition-winner', (data) => {
-    console.log('Received competition winner:', data);  // Debug log
+    console.log('Received competition winner:', data);
     
-    // Generate a unique response ID using message content and timestamp
+    // Generate a unique response ID
     const responseId = `${data.message}-${data.timestamp}`;
     
     // Don't process if this response was already handled
@@ -216,29 +216,11 @@ socket.on('competition-winner', (data) => {
     // Add to processed responses
     processedResponses.add(responseId);
     
-    // Don't process if this winner was already announced
-    const existingWinners = messagesContainer.querySelectorAll('.winner-message');
-    for (const winner of existingWinners) {
-        if (winner.dataset.messageId === String(data.timestamp)) {
-            return; // Skip if winner already announced
-        }
-    }
-    
-    competitionEndTime = null;
-    if (competitionInterval) {
-        clearInterval(competitionInterval);
-    }
-    
-    if (competitionStatus) {
-        competitionStatus.textContent = 'Winner selected! Next round starting soon...';
-        competitionStatus.className = 'status-waiting';
-    }
-    
-    // Add winner announcement
+    // Add winner announcement to messages container
     const winnerMessage = document.createElement('div');
     winnerMessage.className = 'message winner-message';
     winnerMessage.dataset.messageId = String(data.timestamp);
-    winnerMessage.dataset.responseId = responseId; // Add response ID to DOM
+    winnerMessage.dataset.responseId = responseId;
     winnerMessage.innerHTML = `
         <div class="winner-banner">
             🏆 Winning Message!
@@ -255,12 +237,21 @@ socket.on('competition-winner', (data) => {
         </div>
     `;
     
-    messagesContainer.prepend(winnerMessage);
-    winnerMessage.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainer) {
+        messagesContainer.prepend(winnerMessage);
+        winnerMessage.scrollIntoView({ behavior: 'smooth' });
+    }
 
-    // Play audio response if available and not already played
-    if (data.audioUrl && !processedResponses.has(data.audioUrl)) {
-        processedResponses.add(data.audioUrl);
+    // Play audio response if available
+    if (data.audioUrl) {
+        // Add a play button for iOS
+        const playButton = document.createElement('button');
+        playButton.className = 'play-audio-button';
+        playButton.innerHTML = '▶️ Play Response';
+        playButton.onclick = () => playAudioResponse(data.audioUrl, data.response);
+        winnerMessage.querySelector('.kaia-response').appendChild(playButton);
+        
+        // Also try to play automatically
         playAudioResponse(data.audioUrl, data.response);
     }
 });
@@ -299,65 +290,6 @@ function initializeMessageHandling() {
     socket.on('new-message', (data) => {
         console.log('Received new message:', data);
         addMessage(data, data.userId === localStorage.getItem('deviceId'));
-    });
-
-    // Handle competition winner
-    socket.on('competition-winner', (data) => {
-        console.log('Received competition winner:', data);
-        
-        // Generate a unique response ID
-        const responseId = `${data.message}-${data.timestamp}`;
-        
-        // Don't process if this response was already handled
-        if (processedResponses.has(responseId)) {
-            console.log('Skipping duplicate response:', responseId);
-            return;
-        }
-        
-        // Add to processed responses
-        processedResponses.add(responseId);
-        
-        competitionEndTime = null;
-        if (competitionInterval) {
-            clearInterval(competitionInterval);
-        }
-        
-        if (competitionStatus) {
-            competitionStatus.textContent = 'Winner selected! Next round starting soon...';
-            competitionStatus.className = 'status-waiting';
-        }
-        
-        // Add winner announcement to messages container
-        const winnerMessage = document.createElement('div');
-        winnerMessage.className = 'message winner-message';
-        winnerMessage.dataset.messageId = String(data.timestamp);
-        winnerMessage.dataset.responseId = responseId;
-        winnerMessage.innerHTML = `
-            <div class="winner-banner">
-                🏆 Winning Message!
-                <div class="score">Score: ${Math.round(data.score * 10) / 10}</div>
-            </div>
-            <div class="message-content">
-                <strong>${data.userName || 'Anonymous'}</strong>: ${data.message}
-            </div>
-            <div class="kaia-response">
-                <div class="response-header">
-                    <span class="ai-indicator">🎙️ Kaia's Response:</span>
-                </div>
-                ${data.response}
-            </div>
-        `;
-        
-        if (messagesContainer) {
-            messagesContainer.prepend(winnerMessage);
-            winnerMessage.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Play audio response if available
-        if (data.audioUrl && !processedResponses.has(data.audioUrl)) {
-            processedResponses.add(data.audioUrl);
-            playAudioResponse(data.audioUrl, data.response);
-        }
     });
 
     // Handle audio playback command
@@ -686,112 +618,86 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Initialize audio elements with better iOS support
-const responseAudio = document.getElementById('response-audio');
-const enableAudioButton = document.getElementById('enable-audio');
+// Initialize audio playback with iOS support
 let audioContext = null;
 let audioInitialized = false;
-let audioInitializationAttempts = 0;
-const MAX_INIT_ATTEMPTS = 3;
 
-// Function to initialize audio with retry logic
-async function initializeAudio() {
+// Function to initialize audio context
+async function initializeAudioContext() {
     if (audioInitialized) return true;
     
-    if (audioInitializationAttempts >= MAX_INIT_ATTEMPTS) {
-        console.error('Failed to initialize audio after multiple attempts');
-        return false;
-    }
-    
     try {
-        audioInitializationAttempts++;
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioContext();
         
         // For iOS, we need to resume the context after user interaction
         if (audioContext.state === 'suspended') {
-            enableAudioButton.style.display = 'block';
-            enableAudioButton.onclick = async () => {
-                try {
-                    await audioContext.resume();
-                    enableAudioButton.style.display = 'none';
-                    audioInitialized = true;
-                    // Try playing any pending audio
-                    if (currentAudioUrl && currentAudioText) {
-                        playAudioResponse(currentAudioUrl, currentAudioText);
-                    }
-                } catch (error) {
-                    console.error('Error resuming audio context:', error);
-                }
-            };
-            return false;
+            await audioContext.resume();
         }
         
         audioInitialized = true;
         return true;
     } catch (error) {
-        console.error('Error initializing audio:', error);
+        console.error('Error initializing audio context:', error);
         return false;
     }
 }
 
-// Store current audio info for retry
-let currentAudioUrl = null;
-let currentAudioText = null;
+// Initialize audio on first user interaction
+document.addEventListener('touchstart', initializeAudioContext, { once: true });
+document.addEventListener('click', initializeAudioContext, { once: true });
 
 // Enhanced audio playback function with better iOS support
 async function playAudioResponse(audioUrl, text) {
     if (!audioUrl) return;
     
-    currentAudioUrl = audioUrl;
-    currentAudioText = text;
-    
-    // Try to initialize audio if not already done
-    if (!audioInitialized) {
-        const initialized = await initializeAudio();
-        if (!initialized) {
-            console.log('Waiting for user interaction to initialize audio...');
-            return;
+    try {
+        // Initialize audio context if needed
+        if (!audioInitialized) {
+            await initializeAudioContext();
         }
-    }
-    
-    // Update UI
-    if (nowPlaying) {
-        nowPlaying.innerHTML = `🎙️ Loading: ${text || ''}`;
-    }
-    
-    // Configure audio element
-    responseAudio.src = audioUrl.startsWith('http') ? audioUrl : `${window.location.origin}${audioUrl}`;
-    responseAudio.load();
-    
-    // Play audio with retry logic
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    const attemptPlay = async () => {
-        try {
-            await responseAudio.play();
-            console.log('Audio playing successfully');
-            if (nowPlaying) {
-                nowPlaying.innerHTML = `🎙️ Now Playing: ${text || ''}`;
-            }
-        } catch (error) {
-            console.error('Error playing audio:', error);
-            retryCount++;
+        
+        const audio = new Audio();
+        audio.preload = 'auto';
+        
+        // Set up event listeners before setting source
+        audio.oncanplay = () => {
+            console.log('Audio can play, attempting playback...');
+            const playPromise = audio.play();
             
-            if (retryCount < maxRetries) {
-                console.log(`Retrying playback (${retryCount}/${maxRetries})...`);
-                setTimeout(attemptPlay, 1000);
-            } else {
-                if (nowPlaying) {
-                    nowPlaying.innerHTML = '❌ Tap to retry audio';
-                    nowPlaying.onclick = () => playAudioResponse(audioUrl, text);
-                }
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error('Error during audio playback:', error);
+                    // For iOS, try to play on next user interaction
+                    const playOnInteraction = () => {
+                        audio.play().catch(console.error);
+                        document.removeEventListener('touchstart', playOnInteraction);
+                        document.removeEventListener('click', playOnInteraction);
+                    };
+                    document.addEventListener('touchstart', playOnInteraction, { once: true });
+                    document.addEventListener('click', playOnInteraction, { once: true });
+                });
             }
-        }
-    };
-    
-    await attemptPlay();
+        };
+        
+        audio.onended = () => {
+            console.log('Audio playback completed');
+            socket.emit('audio-complete');
+        };
+        
+        audio.onerror = (e) => {
+            console.error('Audio error:', e);
+        };
+        
+        // Set source and load
+        const fullUrl = audioUrl.startsWith('http') ? audioUrl : window.location.origin + audioUrl;
+        console.log('Loading audio from URL:', fullUrl);
+        audio.src = fullUrl;
+        audio.load();
+        
+    } catch (error) {
+        console.error('Error setting up audio playback:', error);
+    }
 }
 
 // Handle audio completion
@@ -803,10 +709,6 @@ responseAudio.addEventListener('ended', () => {
     currentAudioText = null;
     socket.emit('audio-complete');
 });
-
-// Initialize audio on user interaction
-document.addEventListener('touchstart', initializeAudio, { once: true });
-document.addEventListener('click', initializeAudio, { once: true });
 
 // Handle audio playback events
 socket.on('play-audio', (data) => {
