@@ -626,11 +626,11 @@ let audioInitialized = false;
 
 // Function to initialize audio context
 async function initializeAudioContext() {
-    if (audioInitialized) return true;
-    
     try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioContext();
+        if (!audioContext) {
+            audioContext = new AudioContext();
+        }
         
         // For iOS, we need to resume the context after user interaction
         if (audioContext.state === 'suspended') {
@@ -639,12 +639,14 @@ async function initializeAudioContext() {
         
         audioInitialized = true;
         audioEnabled = true;
+        localStorage.setItem(AUDIO_ENABLED_KEY, 'true');
         
-        // Play any pending messages
-        while (pendingAudioMessages.length > 0) {
-            const msg = pendingAudioMessages.shift();
-            await playAudioResponse(msg.audioUrl, msg.text);
-        }
+        // Create and play a silent audio buffer to unlock audio
+        const silentBuffer = audioContext.createBuffer(1, 1, 22050);
+        const source = audioContext.createBufferSource();
+        source.buffer = silentBuffer;
+        source.connect(audioContext.destination);
+        source.start();
         
         return true;
     } catch (error) {
@@ -657,6 +659,8 @@ async function initializeAudioContext() {
 async function playAudioResponse(audioUrl, text) {
     if (!audioUrl) return;
     
+    console.log('Attempting to play audio:', { audioEnabled, currentlyPlaying, audioInitialized });
+    
     if (!audioEnabled) {
         console.log('Audio not enabled, queueing message');
         pendingAudioMessages.push({ audioUrl, text });
@@ -665,7 +669,7 @@ async function playAudioResponse(audioUrl, text) {
     
     try {
         // Initialize audio context if needed
-        if (!audioInitialized) {
+        if (!audioInitialized || (audioContext && audioContext.state === 'suspended')) {
             const initialized = await initializeAudioContext();
             if (!initialized) {
                 console.log('Failed to initialize audio context');
@@ -697,21 +701,42 @@ async function playAudioResponse(audioUrl, text) {
         audio.controls = false;
         
         // Set up event listeners before setting source
-        audio.oncanplay = () => {
+        audio.oncanplay = async () => {
             console.log('Audio can play, attempting playback...');
-            const playPromise = audio.play();
-            
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    console.log('Audio playing successfully');
-                }).catch(error => {
-                    console.error('Error during audio playback:', error);
-                    // On iOS, we need user interaction
-                    if (error.name === 'NotAllowedError') {
-                        pendingAudioMessages.push({ audioUrl, text });
-                        currentlyPlaying = false;
-                    }
-                });
+            try {
+                // For iOS, try to resume audio context before playing
+                if (audioContext && audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('Audio playing successfully');
+                    }).catch(async error => {
+                        console.error('Error during audio playback:', error);
+                        if (error.name === 'NotAllowedError') {
+                            // Try to reinitialize audio context
+                            const reinitialized = await initializeAudioContext();
+                            if (reinitialized) {
+                                // Retry playback
+                                audio.play().catch(e => {
+                                    console.error('Retry playback failed:', e);
+                                    pendingAudioMessages.push({ audioUrl, text });
+                                    currentlyPlaying = false;
+                                });
+                            } else {
+                                pendingAudioMessages.push({ audioUrl, text });
+                                currentlyPlaying = false;
+                            }
+                        } else {
+                            currentlyPlaying = false;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error in oncanplay handler:', error);
+                currentlyPlaying = false;
             }
         };
         
@@ -720,7 +745,7 @@ async function playAudioResponse(audioUrl, text) {
             currentlyPlaying = false;
             socket.emit('audio-complete');
             
-            // Keep audio enabled state
+            // Keep audio enabled state and play next message if available
             if (audioEnabled && pendingAudioMessages.length > 0) {
                 const nextMessage = pendingAudioMessages.shift();
                 playAudioResponse(nextMessage.audioUrl, nextMessage.text);
@@ -731,7 +756,6 @@ async function playAudioResponse(audioUrl, text) {
             console.error('Audio playback error:', e);
             currentlyPlaying = false;
             
-            // Try to recover by playing next message if audio is still enabled
             if (audioEnabled && pendingAudioMessages.length > 0) {
                 const nextMessage = pendingAudioMessages.shift();
                 playAudioResponse(nextMessage.audioUrl, nextMessage.text);
@@ -761,11 +785,6 @@ function addAudioEnableButton() {
     button.onclick = async () => {
         try {
             if (!audioEnabled) {
-                // Try to resume AudioContext first
-                if (audioContext && audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                }
-                
                 const success = await initializeAudioContext();
                 if (success) {
                     audioEnabled = true;
@@ -792,6 +811,8 @@ function addAudioEnableButton() {
                     currentAudioElement = null;
                 }
                 currentlyPlaying = false;
+                // Clear pending messages when audio is disabled
+                pendingAudioMessages = [];
             }
         } catch (error) {
             console.error('Error toggling audio:', error);
