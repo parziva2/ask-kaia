@@ -654,6 +654,7 @@ async function playAudioResponse(audioUrl, text) {
     if (!audioUrl || currentlyPlaying) return;
     
     if (!audioEnabled) {
+        console.log('Audio not enabled, queueing message');
         pendingAudioMessages.push({ audioUrl, text });
         return;
     }
@@ -662,19 +663,27 @@ async function playAudioResponse(audioUrl, text) {
         // Initialize audio context if needed
         if (!audioInitialized) {
             const initialized = await initializeAudioContext();
-            if (!initialized) return;
+            if (!initialized) {
+                console.log('Failed to initialize audio context');
+                return;
+            }
         }
         
         currentlyPlaying = true;
         
         if (currentAudioElement) {
             currentAudioElement.pause();
+            currentAudioElement.src = '';
             currentAudioElement = null;
         }
         
         const audio = new Audio();
         currentAudioElement = audio;
+        
+        // Important for iOS
         audio.preload = 'auto';
+        audio.playsInline = true;
+        audio.controls = false;
         
         // Set up event listeners before setting source
         audio.oncanplay = () => {
@@ -682,13 +691,19 @@ async function playAudioResponse(audioUrl, text) {
             const playPromise = audio.play();
             
             if (playPromise !== undefined) {
-                playPromise.catch(error => {
+                playPromise.then(() => {
+                    console.log('Audio playing successfully');
+                }).catch(error => {
                     console.error('Error during audio playback:', error);
-                    audioEnabled = false;
-                    const button = document.getElementById('enable-audio-button');
-                    if (button) {
-                        button.innerHTML = '🔇';
-                        button.classList.add('disabled');
+                    // On iOS, we need user interaction
+                    if (error.name === 'NotAllowedError') {
+                        audioEnabled = false;
+                        const button = document.getElementById('enable-audio-button');
+                        if (button) {
+                            button.innerHTML = '🔇';
+                            button.classList.add('disabled');
+                        }
+                        pendingAudioMessages.push({ audioUrl, text });
                     }
                     currentlyPlaying = false;
                 });
@@ -707,13 +722,20 @@ async function playAudioResponse(audioUrl, text) {
             }
         };
         
-        audio.onerror = () => {
-            console.error('Audio playback error');
+        audio.onerror = (e) => {
+            console.error('Audio playback error:', e);
             currentlyPlaying = false;
+            
+            // Try to recover by playing next message
+            if (pendingAudioMessages.length > 0 && audioEnabled) {
+                const nextMessage = pendingAudioMessages.shift();
+                playAudioResponse(nextMessage.audioUrl, nextMessage.text);
+            }
         };
         
         // Set source and load
         const fullUrl = audioUrl.startsWith('http') ? audioUrl : window.location.origin + audioUrl;
+        console.log('Loading audio from URL:', fullUrl);
         audio.src = fullUrl;
         audio.load();
         
@@ -732,23 +754,39 @@ function addAudioEnableButton() {
     button.setAttribute('aria-label', audioEnabled ? 'Mute Audio' : 'Enable Audio');
     
     button.onclick = async () => {
-        if (!audioEnabled) {
-            const success = await initializeAudioContext();
-            if (success) {
-                audioEnabled = true;
-                button.innerHTML = '🔊';
-                button.classList.remove('disabled');
-                button.setAttribute('aria-label', 'Mute Audio');
+        try {
+            if (!audioEnabled) {
+                // Try to resume AudioContext first
+                if (audioContext && audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                
+                const success = await initializeAudioContext();
+                if (success) {
+                    audioEnabled = true;
+                    button.innerHTML = '🔊';
+                    button.classList.remove('disabled');
+                    button.setAttribute('aria-label', 'Mute Audio');
+                    
+                    // Try to play any pending messages
+                    if (pendingAudioMessages.length > 0) {
+                        const nextMessage = pendingAudioMessages.shift();
+                        await playAudioResponse(nextMessage.audioUrl, nextMessage.text);
+                    }
+                }
+            } else {
+                audioEnabled = false;
+                button.innerHTML = '🔇';
+                button.classList.add('disabled');
+                button.setAttribute('aria-label', 'Enable Audio');
+                if (currentAudioElement) {
+                    currentAudioElement.pause();
+                    currentAudioElement.src = '';
+                    currentAudioElement = null;
+                }
             }
-        } else {
-            audioEnabled = false;
-            button.innerHTML = '🔇';
-            button.classList.add('disabled');
-            button.setAttribute('aria-label', 'Enable Audio');
-            if (currentAudioElement) {
-                currentAudioElement.pause();
-                currentAudioElement = null;
-            }
+        } catch (error) {
+            console.error('Error toggling audio:', error);
         }
     };
     

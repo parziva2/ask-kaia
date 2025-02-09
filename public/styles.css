@@ -450,25 +450,26 @@ body {
 /* Floating Audio Button */
 .floating-audio-button {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 44px;
-    height: 44px;
+    bottom: max(20px, env(safe-area-inset-bottom, 20px));
+    right: max(20px, env(safe-area-inset-right, 20px));
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.8);
     color: var(--primary-color);
     border: 2px solid var(--primary-color);
-    font-size: 20px;
+    font-size: 24px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 9999;
+    padding: 0;
+    line-height: 1;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     transition: all 0.3s ease;
-    padding: 0;
-    line-height: 1;
 }
 
 .floating-audio-button.disabled {
@@ -525,11 +526,11 @@ body {
     }
     
     .floating-audio-button {
-        bottom: 15px;
-        right: 15px;
-        width: 40px;
-        height: 40px;
-        font-size: 18px;
+        bottom: max(15px, env(safe-area-inset-bottom, 15px));
+        right: max(15px, env(safe-area-inset-right, 15px));
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
     }
 }
 
@@ -553,7 +554,8 @@ body {
     }
     
     .floating-audio-button {
-        bottom: env(safe-area-inset-bottom, 20px);
-        right: env(safe-area-inset-right, 20px);
+        bottom: max(20px, env(safe-area-inset-bottom, 20px));
+        right: max(20px, env(safe-area-inset-right, 20px));
+        padding-bottom: env(safe-area-inset-bottom, 0);
     }
 } 
